@@ -1,88 +1,169 @@
-# Phiếu Lương — Mac App
+# Phiếu Lương App
 
-App Electron để gửi phiếu lương qua email hàng loạt. Chạy 100% local trên Mac, không upload data ra server.
+Desktop app (Electron) để gửi phiếu lương hàng loạt qua email — chạy hoàn toàn cục bộ trên máy, không upload dữ liệu lương lên bất kỳ server nào.
 
-**Flow:** Upload Excel → map cột → preview + dry-run → gửi hàng loạt → báo cáo. Kèm **chế độ test** để làm quen trước khi đụng data lương thật.
+**Hỗ trợ**: macOS (Intel + Apple Silicon) · Windows 10/11 (x64)
 
-## Yêu cầu hệ thống
+---
 
-- macOS (Intel hoặc Apple Silicon) hoặc Windows 10/11 (x64)
-- Node.js ≥ 18 (để build)
-- **qpdf** — để đặt password cho PDF:
+## Tính năng chính
+
+- **Đọc Excel thông minh**: hỗ trợ file nhiều sheet, nhiều kỳ lương, header 2 cấp
+- **Auto-mapping cột**: tự nhận diện cột Họ tên / Email / Mã NV / Lương / BHXH / Thuế... theo keyword tiếng Việt và tiếng Anh
+- **Phiếu lương PDF đẹp**: layout A5, có logo công ty, đọc số thành chữ tiếng Việt, kèm phụ lục bảng công (tuỳ chọn)
+- **Bảo vệ PDF bằng mật khẩu**: qpdf mã hoá AES-256, mỗi người nhận có mật khẩu riêng
+- **Gửi hàng loạt qua Gmail SMTP**: retry tự động, delay giữa các email, tiến trình real-time
+- **Checkpoint & resume**: gửi dở bị ngắt → lần sau mở app có thể tiếp tục
+- **Chế độ test & giả lập**: kiểm tra toàn bộ flow trước khi gửi email thật
+- **Lịch sử gửi**: mã hoá, ghi metadata (không ghi số tiền)
+- **Tracking email mở** *(tuỳ chọn)*: pixel tracking qua server Vercel riêng
+- **Tự cập nhật**: electron-updater qua GitHub Releases
+
+---
+
+## Bắt đầu nhanh
+
+### Yêu cầu
+
+- **Node.js ≥ 18**
+- **qpdf** — mã hoá PDF:
   - macOS: `brew install qpdf`
-  - Windows: `choco install qpdf` (cần [Chocolatey](https://chocolatey.org/install)) hoặc tải tại [qpdf.sourceforge.io](https://qpdf.sourceforge.io)
-- Tài khoản Gmail có bật 2FA + App Password ([hướng dẫn](https://myaccount.google.com/apppasswords))
+  - Windows: `choco install qpdf`
+- **Gmail App Password** — [tạo tại đây](https://myaccount.google.com/apppasswords) (cần bật 2FA trước)
 
-## Cài đặt & chạy dev
+### Chạy dev
 
 ```bash
 cd phieu-luong-app
 npm install
-npm run seed-mockup     # sinh file mockup/sample-payroll.xlsx (15 NV giả)
-npm run dev             # mở app ở chế độ dev (hot reload)
+npm run seed-mockup    # tạo file Excel mẫu với 15 nhân viên giả
+npm run dev            # mở app (Vite + Electron)
 ```
 
-## Build
+### Build
 
 ```bash
-# macOS (chạy trên Mac)
-npm run build:mac
-# output: release/Phieu Luong-0.1.0.dmg
-
-# Windows (chạy trên Windows)
-npm run build:win
-# output: release/Phieu Luong Setup 0.1.0.exe
+npm run build:mac      # → release/Phieu Luong-X.Y.Z.dmg   (chạy trên Mac)
+npm run build:win      # → release/Phieu Luong Setup X.Y.Z.exe  (chạy trên Windows)
 ```
 
-> Bản demo chưa code-sign. Mac: cảnh báo "app từ nhà phát triển không xác định" → chuột phải → Open. Windows: SmartScreen cảnh báo → More info → Run anyway.
+---
 
-### CI build tự động
+## Quy trình sử dụng
 
-Push tag `v0.1.0` lên GitHub → `.github/workflows/build.yml` tự build cả `.dmg` + `.exe` và release artifacts. Xem workflow tại `../.github/workflows/build.yml`.
+```
+1. Cài đặt lần đầu
+   └─ Nhập tên công ty + logo + Gmail + App Password
 
-## Demo nhanh với data giả
+2. Kỳ lương mới
+   ├─ Kéo thả file Excel hoặc bấm "Kỳ lương mới"
+   ├─ Chọn sheet (nếu nhiều sheet)
+   ├─ Chọn kỳ (nếu file chứa nhiều tháng)
+   └─ Mapping cột (nếu auto-detect chưa đủ)
 
-Xem `mockup/README.md`.
+3. Preview & kiểm tra
+   ├─ Xem danh sách hợp lệ / lỗi
+   ├─ Xem trước PDF từng người
+   └─ Gửi thử 1–3 email về hộp thư của mình (dry run)
+
+4. Gửi thật
+   ├─ Chọn người nhận (mặc định tất cả hợp lệ)
+   └─ Theo dõi tiến trình real-time
+
+5. Lịch sử
+   └─ Xem ai đã nhận / ai lỗi / ai đã mở email
+```
+
+---
+
+## Chế độ gửi
+
+| Chế độ | Gửi email thật? | Đến đâu? | Dùng khi |
+|---|---|---|---|
+| **Giả lập** (mặc định bật) | Không | — | Làm quen app, test mapping |
+| **Test** | Có | Email test của bạn | Kiểm tra layout PDF + nội dung email |
+| **Dry Run** | Có | Email test của bạn | Preview 1–3 email mẫu trước khi gửi cả batch |
+| **Thật** | Có | Email từng nhân viên | Gửi chính thức |
+
+---
 
 ## Cấu trúc
 
 ```
 phieu-luong-app/
 ├── electron/            # Main process (Node.js)
-│   ├── main.ts          # App lifecycle + window
-│   ├── preload.ts       # Expose window.api type-safe
-│   ├── modules/
-│   │   ├── excelReader.ts
-│   │   ├── mappingValidator.ts
-│   │   ├── pdfRenderer.ts      # HTML → PDF (printToPDF) + qpdf encrypt
-│   │   ├── emailSender.ts       # nodemailer Gmail SMTP
-│   │   └── settingsStore.ts     # electron-store + safeStorage
-│   └── ipc/handlers.ts
-├── src/                 # Renderer (React)
-│   ├── App.tsx
-│   ├── lib/api.ts       # Typed client của window.api
-│   └── screens/         # Setup, Home, Upload, Mapping, Preview, SendProgress, History
-├── mockup/
-│   └── sample-payroll.xlsx
-├── scripts/generate-mockup.mjs
-└── docs/superpowers/specs/2026-04-21-phieu-luong-app-design.md
+│   ├── main.ts          # App lifecycle, auto-updater
+│   ├── preload.ts       # contextBridge → window.api
+│   ├── ipc/handlers.ts  # Toàn bộ ipcMain.handle()
+│   └── modules/
+│       ├── excelReader.ts       # SheetJS, auto-detect header
+│       ├── mappingValidator.ts  # Validate + map → Employee[]
+│       ├── pdfRenderer.ts       # HTML→PDF→qpdf encrypt
+│       ├── emailSender.ts       # Nodemailer SMTP + retry
+│       └── settingsStore.ts     # electron-store + safeStorage
+├── src/                 # Renderer (React + TypeScript + Tailwind)
+│   ├── App.tsx          # State machine router
+│   ├── lib/
+│   │   ├── api.ts           # Typed client wrapper
+│   │   └── autoMapping.ts   # Keyword-based column detection
+│   └── screens/         # SetupScreen, HomeScreen, MappingScreen,
+│                        # PreviewScreen, SendProgressScreen, HistoryScreen
+├── scripts/
+│   ├── generate-mockup.mjs  # Sinh Excel mẫu
+│   ├── release.mjs          # Bump → build → GitHub Release
+│   └── smoke-test.mjs       # Test pipeline không cần Electron
+├── docs/
+│   ├── user-guide.md        # Hướng dẫn người dùng
+│   ├── architecture.md      # Kiến trúc kỹ thuật
+│   └── developer-guide.md   # Hướng dẫn phát triển
+└── mockup/
+    └── sample-payroll.xlsx  # Data giả cho demo
 ```
+
+---
 
 ## Bảo mật
 
-- Gmail App Password được encrypt bằng Electron `safeStorage` (Keychain của Mac)
-- Password không bao giờ ra khỏi main process — renderer chỉ thấy `isConfigured: boolean`
-- File Excel không được ghi lên disk app: chỉ đọc stream → parse → discard
-- PDF tạm được xoá ngay sau khi gửi xong
-- Log chỉ lưu metadata (số, thời gian, success/fail), KHÔNG lưu số tiền lương cụ thể
-- Password PDF = CCCD (fallback Mã NV nếu CCCD rỗng)
+- **Gmail App Password** mã hoá bằng Electron `safeStorage` (Keychain / DPAPI) — không bao giờ ra khỏi main process
+- **File Excel** chỉ đọc trong RAM, không ghi ra disk app, không upload
+- **PDF tạm** xoá ngay sau khi gửi; startup app dọn sạch file còn sót
+- **Lịch sử** mã hoá bằng safeStorage — chỉ lưu metadata, không lưu số tiền
+- **Tracker server** chỉ thấy token UUID, không biết tên/email nhân viên
 
-## Trạng thái
+---
 
-**V0.1 (hiện tại):** Setup wizard, upload + mapping thủ công, preview table, dry-run, test mode, send batch với progress, PDF password-protected, history metadata.
+## Tài liệu
 
-**V0.2 (chưa làm):** Save mapping profile (tự match lần sau), tải CSV báo cáo, retry với backoff nâng cao.
+| | |
+|---|---|
+| [Hướng dẫn người dùng](docs/user-guide.md) | Dành cho HR / người phụ trách trả lương |
+| [Kiến trúc kỹ thuật](docs/architecture.md) | IPC bridge, modules, data flow |
+| [Hướng dẫn phát triển](docs/developer-guide.md) | Setup, build, release, debug |
+| [Tracker setup](../phieu-luong-tracker/README.md) | Deploy server tracking email mở |
+| [Mockup data](mockup/README.md) | Cách dùng data giả để demo |
+| [CHANGELOG](CHANGELOG.md) | Lịch sử thay đổi |
 
-**V0.3:** Code-sign + notarize, auto-update, editor template trong app.
+---
 
-Xem spec đầy đủ tại [docs/superpowers/specs/2026-04-21-phieu-luong-app-design.md](../docs/superpowers/specs/2026-04-21-phieu-luong-app-design.md).
+## Scripts
+
+| Lệnh | Mô tả |
+|---|---|
+| `npm run dev` | Dev mode: Vite + Electron |
+| `npm run seed-mockup` | Sinh `mockup/sample-payroll.xlsx` |
+| `npm test` | Type check + smoke test pipeline |
+| `npm run build:mac` | Build DMG (phải chạy trên Mac) |
+| `npm run build:win` | Build EXE installer (phải chạy trên Windows) |
+| `npm run release` | Patch release: bump → build → GitHub Release |
+| `npm run release:minor` | Minor release |
+| `npm run release:major` | Major release |
+
+---
+
+## Giới hạn hiện tại (v0.1)
+
+- **Gmail only** — chưa hỗ trợ SMTP server tuỳ chỉnh hay Office 365
+- **Mapping không lưu profile** — mỗi tháng cần auto-detect lại (nếu đổi file)
+- **Phụ lục bảng công** — chưa có UI nhập liệu, cần data từ source khác
+- **Code-sign chưa có** — cảnh báo Gatekeeper/SmartScreen khi cài lần đầu
+- **~500 email/ngày** giới hạn của Gmail SMTP free; ~2000/ngày với Google Workspace
