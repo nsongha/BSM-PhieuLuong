@@ -1,0 +1,95 @@
+{
+  "name": "phieu-luong-app",
+  "version": "0.1.0",
+  "description": "Phiếu lương gửi email hàng loạt — Mac Electron app",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:vite\" \"npm:dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on tcp:5173 && tsc -p electron/tsconfig.json && electron .",
+    "build": "npm run build:renderer && npm run build:electron && electron-builder",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p electron/tsconfig.json",
+    "build:mac": "npm run build:renderer && npm run build:electron && electron-builder --mac",
+    "build:win": "npm run build:renderer && npm run build:electron && electron-builder --win",
+    "build:all": "npm run build:renderer && npm run build:electron && electron-builder -mw",
+    "seed-mockup": "node scripts/generate-mockup.mjs",
+    "test": "npm run build:electron && npx tsc --noEmit -p tsconfig.json && node scripts/smoke-test.mjs"
+  },
+  "keywords": [
+    "electron",
+    "payroll",
+    "phieu-luong",
+    "email"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.3",
+    "lucide-react": "^1.8.0",
+    "nodemailer": "^6.9.16",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.39",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.phieuluong.app",
+    "productName": "Phiếu Lương",
+    "publish": {
+      "provider": "github",
+      "owner": "nsongha",
+      "repo": "BSM-PhieuLuong"
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist",
+      "dist-electron"
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.business",
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "Phiếu Lương ${version}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Phiếu Lương"
+    }
+  }
+}

@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Phiếu Lương — Flow Chart & Gap Analysis</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --orange: #f97316;
+    --green: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  h1 {
+    margin: 0 0 8px 0;
+    font-size: 28px;
+    color: var(--accent);
+  }
+  .subtitle { color: var(--muted); margin-bottom: 32px; }
+  h2 {
+    margin-top: 48px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 20px;
+  }
+  h3 { margin-top: 32px; }
+  .diagram {
+    background: #fafafa;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .gaps { display: grid; gap: 12px; }
+  .gap {
+    background: var(--surface);
+    border-left: 4px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: center;
+  }
+  .gap.critical { border-left-color: var(--red); }
+  .gap.important { border-left-color: var(--yellow); }
+  .gap.nice { border-left-color: var(--orange); }
+  .gap.fixed { border-left-color: var(--green); opacity: 0.75; }
+  .gap-num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 32px;
+  }
+  .gap-body strong { color: var(--accent); }
+  .gap-file {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .severity {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 8px;
+    text-transform: uppercase;
+  }
+  .severity.critical { background: var(--red); color: white; }
+  .severity.important { background: var(--yellow); color: #0f172a; }
+  .severity.nice { background: var(--orange); color: white; }
+  .severity.fixed { background: var(--green); color: white; }
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-num { font-size: 32px; font-weight: 700; }
+  .stat-num.red { color: var(--red); }
+  .stat-num.yellow { color: var(--yellow); }
+  .stat-num.orange { color: var(--orange); }
+  .stat-num.green { color: var(--green); }
+  .stat-label { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .strike { text-decoration: line-through; text-decoration-color: var(--green); text-decoration-thickness: 2px; color: var(--muted); }
+
+  /* Before/After cards */
+  .ba-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .ba-card h4 {
+    margin: 0 0 4px 0;
+    color: var(--green);
+    font-size: 17px;
+  }
+  .ba-card .ba-meta {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .ba-card .ba-meta code {
+    font-family: 'SF Mono', Monaco, monospace;
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .ba-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  @media (max-width: 900px) {
+    .ba-grid { grid-template-columns: 1fr; }
+  }
+  .ba-col {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .ba-col-head {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .ba-col.before .ba-col-head {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+  }
+  .ba-col.after .ba-col-head {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+  }
+  pre {
+    margin: 0;
+    padding: 12px;
+    background: var(--bg);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--text);
+  }
+  pre .cm { color: var(--muted); font-style: italic; }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #fcd34d; }
+  pre .add { background: rgba(34,197,94,0.18); display: block; }
+  pre .del { background: rgba(239,68,68,0.18); display: block; }
+  .ba-why {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .ba-why b { color: var(--accent); }
+  .banner {
+    background: linear-gradient(90deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05));
+    border: 1px solid var(--green);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 24px 0;
+  }
+  .banner h3 { margin: 0 0 4px 0; color: var(--green); }
+  .banner p { margin: 0; color: var(--text); }
+</style>
+</head>
+<body>
+
+<h1>Phiếu Lương — Flow Chart & Gap Analysis</h1>
+<p class="subtitle">Electron + React app gửi bảng lương hàng loạt qua email với PDF mã hoá bằng CCCD</p>
+
+<div class="banner">
+  <h3>✓ 17/17 gap gốc + 5 QA hardening (2026-04-22)</h3>
+  <p>Round 1 (gap analysis) xử lý flow/product: 5 critical + 7 important + 5 nice-to-have. Round 2 (QA API surface) xử lý robustness: malformed payload, method guards, silent truncation ở 500 tokens, và boot error UX. Xem chi tiết trong mục <b>"Before / After"</b> bên dưới. Type-check: pass cả renderer + electron + tracker.</p>
+</div>
+
+<div class="summary">
+  <div class="stat"><div class="stat-num green">22</div><div class="stat-label">Đã sửa (17 gap + 5 QA)</div></div>
+  <div class="stat"><div class="stat-num red">0</div><div class="stat-label">Critical còn lại</div></div>
+  <div class="stat"><div class="stat-num yellow">0</div><div class="stat-label">Important còn lại</div></div>
+  <div class="stat"><div class="stat-num orange">0</div><div class="stat-label">QA còn lại</div></div>
+</div>
+
+<h2>1. Luồng chính (sau khi sửa)</h2>
+
+<div class="legend">
+  <div class="legend-item"><span class="dot" style="background:#93c5fd"></span> Màn hình</div>
+  <div class="legend-item"><span class="dot" style="background:#fde68a"></span> Xử lý / logic</div>
+  <div class="legend-item"><span class="dot" style="background:#c7d2fe"></span> IPC / backend</div>
+  <div class="legend-item"><span class="dot" style="background:#fca5a5"></span> Decision</div>
+  <div class="legend-item"><span class="dot" style="background:#86efac"></span> Storage</div>
+  <div class="legend-item"><span class="dot" style="background:#fef08a"></span> Mới thêm (fix)</div>
+</div>
+
+<div class="diagram">
+<pre class="mermaid">
+flowchart TD
+    Start([App khởi động]) --> Sweep[/🧹 sweepLeakedPdfs<br/>dọn temp PDF crash cũ/]
+    Sweep --> LoadSettings[Load settings<br/>+ check qpdf]
+    LoadSettings --> CheckCP{Có checkpoint<br/>chưa hoàn thành?}
+    CheckCP -->|Có| Banner[⚠️ Banner Home:<br/>Tiếp tục / Bỏ qua]
+    CheckCP -->|Không| HasSettings{Có Gmail?}
+    Banner --> HasSettings
+    HasSettings -->|Không| Setup[Setup Screen<br/>+ Tracker secret field]
+    HasSettings -->|Có| Home[Home Screen]
+    Setup --> Home
+
+    Online{Online?} -.->|Offline| Banner2[🔴 Banner:<br/>Mất kết nối Internet]
+    Home -. theo dõi .-> Online
+
+    Home --> UploadExcel[Upload/Drop Excel]
+    UploadExcel --> ReadExcel[excelReader.readXlsx]
+    ReadExcel --> AutoMap[autoDetectMapping]
+    AutoMap --> Validate[mappingValidator<br/>+ CCCD 9 hoặc 12 số]
+    Validate --> Preview[Preview Screen]
+
+    Preview -->|Gửi thử<br/>disabled khi offline| DryRun[Dry-run 3 mẫu]
+    DryRun --> Preview
+    Preview -->|Gửi thật<br/>disabled khi offline| SendProgress[SendProgress Screen]
+
+    SendProgress --> SaveCP1[(💾 persistCheckpoint<br/>encrypted)]
+    SaveCP1 --> LoopEmp{Còn NV?}
+    LoopEmp -->|Có| Simulate{simulate?}
+    Simulate -->|Có| FakeDelay[Delay 400-800ms]
+    Simulate -->|Không| RenderPDF[Render PDF<br/>trong phieu-luong-pdf/]
+    RenderPDF --> GenToken[Gen trackToken]
+    GenToken --> SendRetry[sendWithRetry<br/>Gmail SMTP]
+    SendRetry --> Cleanup[cleanupPdf]
+    FakeDelay --> ProcessedSet[processed.add<br/>+ persistCheckpoint]
+    Cleanup --> ProcessedSet
+    ProcessedSet --> LoopEmp
+    LoopEmp -->|Hết| SaveLog[(Lưu log<br/>+ clearCheckpoint)]
+    SaveLog --> Home
+
+    Home -->|Lịch sử| History[History Screen]
+    History --> Home
+
+    UserOpen[/📧 User mở email/] -.->|pixel 1x1| TrackAPI[Vercel<br/>/api/t/token.gif]
+    TrackAPI --> Redis[(Upstash Redis)]
+
+    QueryOpens[tracker:query-opens<br/>🔒 Bearer Authorization] -.->|query| OpensAPI[/api/opens<br/>validate TRACKER_SECRET/]
+    OpensAPI --> Redis
+    Preview -.-> QueryOpens
+    History -.-> QueryOpens
+
+    classDef screen fill:#93c5fd,stroke:#1e40af,color:#000
+    classDef logic fill:#fde68a,stroke:#a16207,color:#000
+    classDef ipc fill:#c7d2fe,stroke:#4338ca,color:#000
+    classDef decision fill:#fca5a5,stroke:#991b1b,color:#000
+    classDef storage fill:#86efac,stroke:#166534,color:#000
+    classDef fixed fill:#fef08a,stroke:#a16207,color:#000,stroke-width:2px
+
+    class Setup,Home,Mapping,Preview,SendProgress,History screen
+    class LoadSettings,AutoMap,Validate,DryRun,FakeDelay GenToken logic
+    class ReadExcel,RenderPDF,SendRetry,Cleanup,TrackAPI,OpensAPI ipc
+    class HasSettings,LoopEmp,Simulate,Online,CheckCP decision
+    class SaveLog,Redis storage
+    class Sweep,Banner,Banner2,SaveCP1,ProcessedSet,QueryOpens fixed
+</pre>
+</div>
+
+<h2>2. Before / After — 5 critical gap đã sửa</h2>
+
+<div class="ba-card">
+  <h4>✓ Gap 1 — Resume checkpoint khi gửi batch</h4>
+  <div class="ba-meta">
+    Files: <code>electron/ipc/handlers.ts</code>, <code>electron/modules/settingsStore.ts</code>, <code>src/App.tsx</code>
+  </div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="cm">// send-batch: chỉ giữ state trong RAM</span>
+<span class="kw">let</span> succeeded = 0;
+<span class="kw">let</span> failed = 0;
+<span class="kw">const</span> recipients = [];
+
+<span class="kw">for</span> (<span class="kw">const</span> emp <span class="kw">of</span> employees) {
+  <span class="cm">// gửi, cập nhật recipients[]...</span>
+}
+<span class="cm">// App crash ở giữa = mất hết
+// tracking, không biết gửi đến đâu</span>
+finishLog();</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">const</span> existing = getCheckpoint();
+<span class="kw">const</span> resuming = existing &&
+  existing.opts.month === opts.month && <span class="cm">/* … */</span>;
+
+<span class="kw">const</span> processed = <span class="kw">new</span> Set(
+  resuming ? existing.processedRowIndexes : []
+);
+<span class="kw">const</span> recipients = resuming ? [...existing.recipients] : [];
+persistCheckpoint(); <span class="cm">// encrypted via safeStorage</span>
+
+<span class="kw">for</span> (<span class="kw">const</span> emp <span class="kw">of</span> employees) {
+  <span class="kw">if</span> (processed.has(emp.rowIndex)) <span class="kw">continue</span>;
+  <span class="cm">// … gửi …</span>
+  processed.add(emp.rowIndex);
+  persistCheckpoint(); <span class="cm">// sau MỖI nhân viên</span>
+}
+finishLog(); clearCheckpoint();</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> State batch (employees + settings + opts + processedRowIndexes + recipients) giờ được
+    encrypt bằng <code>safeStorage</code> và lưu vào <code>electron-store</code> sau mỗi nhân viên. Khi app
+    restart, nếu còn checkpoint, banner vàng xuất hiện trên Home — user chọn <b>"Tiếp tục"</b> (send-batch
+    chạy lại, skip các <code>rowIndex</code> đã có trong <code>processedRowIndexes</code>) hoặc
+    <b>"Bỏ qua & ghi vào lịch sử"</b> (phần đã gửi được append vào log, checkpoint xoá).
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 2 — Bearer auth cho /api/opens</h4>
+  <div class="ba-meta">
+    Files: <code>phieu-luong-tracker/api/opens.ts</code>, <code>electron/ipc/handlers.ts</code>,
+    <code>SetupScreen.tsx</code>
+  </div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before (opens.ts)</div>
+<pre><span class="kw">export default async function</span> handler(req, res) {
+  res.setHeader(<span class="str">'Access-Control-Allow-Origin'</span>, <span class="str">'*'</span>);
+
+  <span class="cm">// ⚠️ KHÔNG CÓ AUTH
+  // Ai biết token UUID đều query được</span>
+
+  <span class="kw">if</span> (!redis) { <span class="cm">/* … */</span> }
+
+  <span class="kw">let</span> tokens = [];
+  <span class="cm">// … parse tokens, query Redis, return …</span>
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">function</span> timingSafeEqual(a, b) {
+  <span class="kw">if</span> (a.length !== b.length) <span class="kw">return false</span>;
+  <span class="kw">let</span> diff = 0;
+  <span class="kw">for</span> (<span class="kw">let</span> i = 0; i &lt; a.length; i++)
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  <span class="kw">return</span> diff === 0;
+}
+
+<span class="kw">export default async function</span> handler(req, res) {
+  <span class="kw">const</span> expected = process.env.TRACKER_SECRET;
+  <span class="kw">if</span> (expected) {
+    <span class="kw">const</span> auth = String(req.headers.authorization);
+    <span class="kw">const</span> presented = auth.startsWith(<span class="str">'Bearer '</span>)
+      ? auth.slice(7) : <span class="str">''</span>;
+    <span class="kw">if</span> (!presented || !timingSafeEqual(presented, expected)) {
+      res.status(401).json({ error: <span class="str">'unauthorized'</span> });
+      <span class="kw">return</span>;
+    }
+  }
+  <span class="cm">// … tiếp tục như cũ …</span>
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Set <code>TRACKER_SECRET</code> trên Vercel → endpoint yêu cầu header
+    <code>Authorization: Bearer &lt;secret&gt;</code>. App lưu secret đã encrypt trong
+    <code>safeStorage</code>, tự đính kèm vào mọi request <code>queryOpens</code> và <code>ping</code>.
+    So sánh bằng <code>timingSafeEqual</code> để tránh timing attack. Backward-compat: nếu env chưa set,
+    endpoint vẫn mở như cũ (không break deployment đang chạy).
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 3 — Validate CCCD format</h4>
+  <div class="ba-meta">
+    File: <code>electron/modules/mappingValidator.ts</code>
+  </div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">const</span> EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+<span class="cm">// …</span>
+
+<span class="kw">if</span> (!maNV) errors.push(<span class="str">'Thiếu Mã NV'</span>);
+<span class="kw">if</span> (!cccd) errors.push(<span class="str">'Thiếu CCCD (dùng làm password PDF)'</span>);
+<span class="cm">// ⚠️ "123" cũng pass được
+// → password PDF yếu</span>
+<span class="kw">if</span> (!Number.isFinite(thucNhan))
+  errors.push(<span class="str">'Thực nhận không phải số hợp lệ'</span>);</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">const</span> EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+<span class="cm">// CCCD (12 số) hoặc CMND (9 số)</span>
+<span class="kw">const</span> CCCD_RE = /^\d{9}$|^\d{12}$/;
+
+<span class="cm">// …</span>
+
+<span class="kw">if</span> (!maNV) errors.push(<span class="str">'Thiếu Mã NV'</span>);
+<span class="kw">if</span> (!cccd) errors.push(<span class="str">'Thiếu CCCD (dùng làm password PDF)'</span>);
+<span class="kw">else if</span> (!CCCD_RE.test(cccd))
+  errors.push(<span class="str">'CCCD phải là 9 hoặc 12 chữ số'</span>);
+<span class="kw">if</span> (!Number.isFinite(thucNhan))
+  errors.push(<span class="str">'Thực nhận không phải số hợp lệ'</span>);</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> CCCD dùng làm password PDF. Trước đây chỉ check non-empty → dòng có CCCD rỗng hoặc
+    ký tự rác vẫn pass, password PDF yếu hoặc rỗng. Giờ validate format chuẩn VN (CMND 9 số hoặc CCCD
+    12 số). Dòng không hợp lệ sẽ bị đánh dấu lỗi và không được gửi.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 4 — Offline detection</h4>
+  <div class="ba-meta">
+    Files: <code>src/lib/useOnline.ts</code> (mới), <code>src/App.tsx</code>, <code>src/screens/PreviewScreen.tsx</code>
+  </div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="cm">// Không có offline detection ở đâu cả
+// User offline → bấm Gửi → SMTP fail từng email
+// Tracker query fail → return {} im lặng
+// Không có banner, nút vẫn enable</span></pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="cm">// useOnline.ts (mới)</span>
+<span class="kw">export function</span> useOnline() {
+  <span class="kw">const</span> [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    <span class="kw">const</span> on = () => setOnline(<span class="kw">true</span>);
+    <span class="kw">const</span> off = () => setOnline(<span class="kw">false</span>);
+    window.addEventListener(<span class="str">'online'</span>, on);
+    window.addEventListener(<span class="str">'offline'</span>, off);
+    <span class="kw">return</span> () => { <span class="cm">/* cleanup */</span> };
+  }, []);
+  <span class="kw">return</span> online;
+}
+
+<span class="cm">// App.tsx: banner đỏ khi offline</span>
+{!online && (
+  &lt;<span class="kw">div</span> className=<span class="str">"bg-red-100 …"</span>&gt;
+    &lt;WifiOff /&gt; Mất kết nối Internet…
+  &lt;/<span class="kw">div</span>&gt;
+)}
+
+<span class="cm">// PreviewScreen: disable nút khi offline + không simulate</span>
+&lt;<span class="kw">button</span> disabled={offlineBlocked} …&gt;Gửi&lt;/<span class="kw">button</span>&gt;</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Hook <code>useOnline</code> theo dõi <code>navigator.onLine</code> +
+    <code>online</code>/<code>offline</code> events. App.tsx show banner đỏ. PreviewScreen disable
+    "Gửi thử" + "Gửi thật" khi offline và không ở chế độ simulate (simulate không cần network). Khi kết nối
+    trở lại, banner tự biến mất và nút enable lại.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 5 — Crash-safe PDF cleanup</h4>
+  <div class="ba-meta">
+    Files: <code>electron/modules/pdfRenderer.ts</code>, <code>electron/main.ts</code>
+  </div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="cm">// Mỗi lần render = mkdtemp ngẫu nhiên
+// trong os.tmpdir()</span>
+<span class="kw">const</span> tmpDir = fs.mkdtempSync(
+  path.join(os.tmpdir(), <span class="str">'phieu-luong-'</span>)
+);
+
+<span class="cm">// cleanupPdf chỉ chạy trong finally
+// → app crash = PDF chứa bảng lương thật
+// bị rò rỉ trong /tmp vĩnh viễn</span>
+<span class="kw">export function</span> cleanupPdf(pdfPath) {
+  <span class="kw">try</span> {
+    fs.unlinkSync(pdfPath);
+    fs.rmdirSync(path.dirname(pdfPath));
+  } <span class="kw">catch</span> {}
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="cm">// Dùng một temp root cố định</span>
+<span class="kw">const</span> TEMP_ROOT = path.join(os.tmpdir(), <span class="str">'phieu-luong-pdf'</span>);
+
+<span class="kw">function</span> ensureTempRoot() {
+  fs.mkdirSync(TEMP_ROOT, { recursive: <span class="kw">true</span> });
+  <span class="kw">return</span> TEMP_ROOT;
+}
+
+<span class="cm">// Mkdtemp bên trong root cố định</span>
+<span class="kw">const</span> tmpDir = fs.mkdtempSync(path.join(ensureTempRoot(), <span class="str">'enc-'</span>));
+
+<span class="cm">// Sweep lúc startup — dọn rác từ session crash trước</span>
+<span class="kw">export function</span> sweepLeakedPdfs() {
+  <span class="kw">for</span> (<span class="kw">const</span> name <span class="kw">of</span> fs.readdirSync(TEMP_ROOT)) {
+    fs.rmSync(path.join(TEMP_ROOT, name), { recursive: <span class="kw">true</span>, force: <span class="kw">true</span> });
+  }
+}
+
+<span class="cm">// main.ts: chạy khi app ready</span>
+app.whenReady().then(() => {
+  sweepLeakedPdfs();
+  registerIpcHandlers();
+  createMainWindow();
+});</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Thay vì rải random subdir ra khắp <code>os.tmpdir()</code>, giờ mọi PDF tạm nằm dưới
+    <code>{tmp}/phieu-luong-pdf/</code>. <code>sweepLeakedPdfs()</code> chạy đầu mỗi lần app khởi động,
+    xoá toàn bộ file còn sót từ session crash trước. In-session cleanup vẫn chạy như cũ (finally block).
+    Hai lớp phòng ngự = không còn PDF chứa bảng lương rò rỉ.
+  </div>
+</div>
+
+<h2>3. Before / After — 7 important gap đã sửa</h2>
+
+<div class="ba-card">
+  <h4>✓ Gap 6 — Timeout cho email send</h4>
+  <div class="ba-meta">File: <code>electron/modules/emailSender.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre>nodemailer.createTransport({
+  host: <span class="str">'smtp.gmail.com'</span>,
+  port: 465,
+  secure: <span class="kw">true</span>,
+  auth: { user, pass: password },
+  <span class="cm">// ⚠️ Không có timeout — SMTP chậm
+  // → app hang vô hạn, không cancel được</span>
+});</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre>nodemailer.createTransport({
+  host: <span class="str">'smtp.gmail.com'</span>,
+  port: 465,
+  secure: <span class="kw">true</span>,
+  auth: { user, pass: password },
+  connectionTimeout: 20_000, <span class="cm">// 20s</span>
+  greetingTimeout: 15_000,    <span class="cm">// 15s</span>
+  socketTimeout: 45_000,      <span class="cm">// 45s</span>
+});</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Nodemailer mặc định 10 phút cho socket. Giờ connection chỉ được 20s để handshake,
+    greeting 15s, và socket 45s (đủ để attach PDF ~2MB). Vượt quá → throw, <code>sendWithRetry</code>
+    retry 1 lần nữa rồi mark failed. App không bao giờ treo quá ~2 phút mỗi email.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 7 — Giới hạn kích thước Excel</h4>
+  <div class="ba-meta">File: <code>electron/modules/excelReader.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">export function</span> readXlsx(filePath) {
+  <span class="kw">if</span> (!fs.existsSync(filePath)) {
+    <span class="kw">throw new</span> Error(`File không tồn tại`);
+  }
+  <span class="kw">const</span> buf = fs.readFileSync(filePath);
+  <span class="cm">// ⚠️ File 100MB → load hết vào RAM
+  // → UI freeze hàng chục giây</span>
+  <span class="kw">const</span> wb = XLSX.read(buf, { type: <span class="str">'buffer'</span> });
+  <span class="cm">// …</span>
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">const</span> MAX_FILE_BYTES = 25 * 1024 * 1024; <span class="cm">// 25 MB</span>
+<span class="kw">const</span> MAX_ROWS = 10_000;
+
+<span class="kw">export function</span> readXlsx(filePath) {
+  <span class="kw">const</span> stat = fs.statSync(filePath);
+  <span class="kw">if</span> (stat.size > MAX_FILE_BYTES) {
+    <span class="kw">throw new</span> Error(`File quá lớn (${mb} MB)…`);
+  }
+  <span class="cm">// … đọc như cũ …</span>
+  <span class="kw">if</span> (rowsRaw.length > MAX_ROWS) {
+    <span class="kw">throw new</span> Error(`${rowsRaw.length} dòng — vượt giới hạn ${MAX_ROWS}`);
+  }
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Check file size <i>trước</i> khi đọc để tránh load RAM vô ích. 25 MB là giới hạn thực
+    tế (bảng lương 5000 người thường chỉ ~2 MB). MAX_ROWS 10k vừa an toàn vừa đủ cho tập đoàn vài nghìn
+    người. Vượt quá → throw với thông báo rõ, user tự tách file.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 8 — Phân trang bảng Preview</h4>
+  <div class="ba-meta">File: <code>src/screens/PreviewScreen.tsx</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="cm">// Render toàn bộ hàng filtered vào DOM</span>
+&lt;<span class="kw">tbody</span>&gt;
+  {filtered.map((e) => (
+    &lt;<span class="kw">tr</span> key={e.rowIndex}&gt;
+      <span class="cm">/* 8 cột cho mỗi NV */</span>
+    &lt;/<span class="kw">tr</span>&gt;
+  ))}
+&lt;/<span class="kw">tbody</span>&gt;
+
+<span class="cm">// ⚠️ 1000+ nhân viên = 8000+ DOM nodes
+// → scroll lag, checkbox click chậm</span></pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">const</span> ROW_PAGE = 500;
+<span class="kw">const</span> [visibleCount, setVisibleCount] = useState(ROW_PAGE);
+useEffect(() => { setVisibleCount(ROW_PAGE); }, [search]);
+<span class="kw">const</span> visibleRows = useMemo(
+  () => filtered.slice(0, visibleCount),
+  [filtered, visibleCount]
+);
+
+&lt;<span class="kw">tbody</span>&gt;
+  {visibleRows.map(…)}
+  {filtered.length > visibleCount && (
+    &lt;<span class="kw">tr</span>&gt;&lt;<span class="kw">td</span> colSpan=<span class="str">"8"</span>&gt;
+      &lt;<span class="kw">button</span> onClick={() => setVisibleCount(c => c + ROW_PAGE)}&gt;
+        Hiển thị thêm {ROW_PAGE} dòng
+      &lt;/<span class="kw">button</span>&gt;
+    &lt;/<span class="kw">td</span>&gt;&lt;/<span class="kw">tr</span>&gt;
+  )}
+&lt;/<span class="kw">tbody</span>&gt;</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Giới hạn DOM ở 500 dòng/lần — đủ cho 95% use case. User có thể bấm "Hiển thị thêm"
+    nếu cần, hoặc dùng search (filter thu nhỏ tập hợp). Search reset visibleCount về 500. Select-all
+    checkbox vẫn tác động lên toàn bộ <code>filtered</code> chứ không chỉ visible — đảm bảo data không bị bỏ sót.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 9 — Xoá subjectTemplate dead code</h4>
+  <div class="ba-meta">Files: <code>electron/preload.ts</code>, <code>src/lib/api.ts</code>, <code>src/App.tsx</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">export type</span> SendOptions = {
+  month: string;
+  year: string;
+  testMode: boolean;
+  simulate: boolean;
+  subjectTemplate: string; <span class="cm">// ⚠️ khai báo
+                              // nhưng không ai đọc</span>
+};
+
+<span class="cm">// App.tsx</span>
+setSendOpts({
+  <span class="cm">/* … */</span>
+  subjectTemplate: <span class="str">''</span>, <span class="cm">// set rỗng, không dùng</span>
+});
+
+<span class="cm">// emailSender.ts hardcode subject</span>
+<span class="kw">export function</span> buildSubject(month, year) {
+  <span class="kw">return</span> `[Phiếu lương] Tháng ${month}/${year}`;
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">export type</span> SendOptions = {
+  month: string;
+  year: string;
+  testMode: boolean;
+  simulate: boolean;
+  <span class="cm">// Xoá subjectTemplate — không ai dùng</span>
+};
+
+<span class="cm">// App.tsx gọn hơn</span>
+setSendOpts({
+  month, year, testMode: <span class="kw">false</span>, simulate: <span class="kw">true</span>,
+});</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Dead field chiếm không gian type, gây ảo giác tính năng tuỳ chỉnh subject (thực ra
+    hardcode). Xoá làm code honest hơn. Nếu cần customize subject sau này → thêm lại có chủ ý kèm UI.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 10 — Surface tracker query errors</h4>
+  <div class="ba-meta">Files: <code>electron/ipc/handlers.ts</code>, <code>PreviewScreen.tsx</code>, <code>HistoryScreen.tsx</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">async</span> (_e, endpoint, tokens) => {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> resp = <span class="kw">await</span> fetch(url, …);
+    <span class="kw">if</span> (!resp.ok) <span class="kw">return</span> {}; <span class="cm">// ⚠️ im lặng</span>
+    <span class="kw">return</span> data.tokens ?? {};
+  } <span class="kw">catch</span> (e) {
+    console.error(<span class="str">'[tracker] query error:'</span>, e);
+    <span class="kw">return</span> {};  <span class="cm">// user nghĩ "chưa mở"
+                 // thực ra là tracker down</span>
+  }
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">async</span> (_e, endpoint, tokens) => {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> resp = <span class="kw">await</span> fetch(url, …);
+    <span class="kw">if</span> (!resp.ok) {
+      <span class="kw">const</span> hint = resp.status === 401
+        ? <span class="str">'Tracker secret sai/thiếu…'</span>
+        : `Tracker HTTP ${resp.status}`;
+      <span class="kw">return</span> { ok: <span class="kw">false</span>, error: hint, tokens: {} };
+    }
+    <span class="kw">return</span> { ok: <span class="kw">true</span>, tokens: data.tokens ?? {} };
+  } <span class="kw">catch</span> (e) {
+    <span class="kw">return</span> { ok: <span class="kw">false</span>, error: `Không kết nối…`, tokens: {} };
+  }
+}
+
+<span class="cm">// Preview/History show amber banner</span>
+{trackerError && &lt;<span class="kw">Banner</span>&gt;{trackerError}&lt;/<span class="kw">Banner</span>&gt;}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Phân biệt rõ "tracker OK + chưa mở" vs "tracker lỗi". Trả về <code>{ok, error, tokens}</code>
+    thay vì chỉ <code>tokens</code>. PreviewScreen + HistoryScreen nhận error → show amber banner
+    "Trạng thái đã mở có thể không chính xác — {lý do}". 401 đặc biệt hint là sai tracker secret.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 11 — Cảnh báo gửi trùng cùng kỳ</h4>
+  <div class="ba-meta">File: <code>src/screens/PreviewScreen.tsx</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="cm">// PriorStatus hiển thị "Gửi 3h trước" trên từng hàng
+// nhưng không có cảnh báo tổng, không block
+// ConfirmModal
+// → user dễ double-send cả nghìn phiếu</span>
+
+&lt;<span class="kw">Confirm</span> count={count} onConfirm={send} /&gt;</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">const</span> selectedDuplicates = useMemo(() =>
+  selectedEmployees.filter((e) => {
+    <span class="kw">const</span> p = priorByMaNV[e.maNV];
+    <span class="kw">return</span> p && !p.dryRun && !p.testMode;
+  }),
+  [selectedEmployees, priorByMaNV]
+);
+
+<span class="cm">// Banner trong Preview</span>
+{selectedDuplicates.length > 0 && (
+  &lt;<span class="kw">AmberBanner</span>&gt;
+    {selectedDuplicates.length} NV đã nhận phiếu kỳ này rồi…
+  &lt;/<span class="kw">AmberBanner</span>&gt;
+)}
+
+<span class="cm">// Và warning trong ConfirmModal</span>
+&lt;<span class="kw">Confirm</span> count duplicates={duplicates.length} /&gt;</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Hai lớp warning — amber banner ở Preview (thấy trước khi bấm nút) + repeat trong
+    ConfirmModal (thấy trước khi confirm). Chỉ đếm gửi <i>thật</i> (không phải dry-run/test). Không block
+    cứng — đôi khi user thực sự cần gửi lại (ví dụ fix sai lầm). Nhưng buộc user phải đọc và xác nhận có ý thức.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 12 — qpdf password không qua shell</h4>
+  <div class="ba-meta">File: <code>electron/modules/pdfRenderer.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">const</span> execAsync = promisify(exec);
+
+<span class="kw">async function</span> encryptPdfWithPassword(buffer, password) {
+  <span class="kw">const</span> qpdf = <span class="kw">await</span> getQpdfPath();
+  <span class="cm">// ⚠️ Password đi qua shell — escape không đủ
+  // chỉ thay " bằng \"
+  // Ký tự như $ ; | &amp; `... vẫn bị shell interpret</span>
+  <span class="kw">const</span> escPw = password.replace(/"/g, <span class="str">'\\"'</span>);
+  <span class="kw">const</span> cmd = `"${qpdf}" --encrypt "${escPw}" "${escPw}" 256 -- <span class="cm">…</span>`;
+  <span class="kw">await</span> execAsync(cmd);
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">const</span> execFileAsync = promisify(execFile);
+
+<span class="kw">async function</span> encryptPdfWithPassword(buffer, password) {
+  <span class="kw">const</span> qpdf = <span class="kw">await</span> getQpdfPath();
+  <span class="cm">// execFile truyền args qua array — KHÔNG qua shell
+  // password bất kỳ ký tự gì cũng an toàn</span>
+  <span class="kw">await</span> execFileAsync(qpdf, [
+    <span class="str">'--encrypt'</span>, password, password, <span class="str">'256'</span>,
+    <span class="str">'--'</span>, inPath, outPath,
+  ]);
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> <code>exec</code> chạy qua <code>/bin/sh -c</code> nên cần escape cẩn thận — escape cũ chỉ xử lý <code>"</code>,
+    ký tự như <code>$</code> <code>;</code> <code>`</code> <code>|</code> vẫn bị shell hiểu nhầm (qpdf crash hoặc
+    command injection nếu password từ input không an toàn). <code>execFile</code> spawn process trực tiếp với
+    args array, OS nhận nguyên văn. Gap 3 đã validate CCCD chỉ chứa số nên attack vector hẹp, nhưng fix này
+    là defense-in-depth đúng hướng. <code>checkQpdf</code> và <code>getQpdfPath</code> cũng được chuyển sang
+    <code>execFile</code> cho nhất quán.
+  </div>
+</div>
+
+<h2>4. Before / After — 5 nice-to-have gap đã sửa</h2>
+
+<div class="ba-card">
+  <h4>✓ Gap 13 — Reject Month/Year không hợp lệ</h4>
+  <div class="ba-meta">File: <code>src/lib/autoMapping.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">export function</span> parsePeriod(raw) {
+  <span class="kw">const</span> s = String(raw).trim();
+  <span class="kw">let</span> m = s.match(/^(\d{1,2})\/(\d{4})$/);
+  <span class="kw">if</span> (m) <span class="kw">return</span> { month: m[1].padStart(2, <span class="str">'0'</span>), year: m[2] };
+  m = s.match(/^(\d{4})-(\d{1,2})$/);
+  <span class="kw">if</span> (m) <span class="kw">return</span> { month: m[2].padStart(2, <span class="str">'0'</span>), year: m[1] };
+  <span class="kw">return null</span>;
+  <span class="cm">// ⚠️ "13/2026" pass → gửi email "tháng 13"
+  // "00/2026" pass → subject kỳ quặc
+  // "05/20260" pass → year ảo</span>
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">export function</span> parsePeriod(raw) {
+  <span class="cm">// … match regex như cũ, lấy monthStr + yearStr …</span>
+  <span class="kw">if</span> (!monthStr || !yearStr) <span class="kw">return null</span>;
+  <span class="kw">const</span> month = Number(monthStr);
+  <span class="kw">const</span> year = Number(yearStr);
+  <span class="kw">if</span> (!Number.isInteger(month) || month &lt; 1 || month > 12)
+    <span class="kw">return null</span>;
+  <span class="cm">// Range hợp lý — reject 202, 20260, 1999, v.v.</span>
+  <span class="kw">if</span> (!Number.isInteger(year) || year &lt; 2000 || year > 2100)
+    <span class="kw">return null</span>;
+  <span class="kw">return</span> { month: String(month).padStart(2, <span class="str">'0'</span>), year: String(year) };
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Regex chỉ check format, không check range. Giờ validate thêm month ∈ [1, 12] và year
+    ∈ [2000, 2100]. Invalid → trả <code>null</code>, App.tsx fallback sang tháng hiện tại (<code>new Date()</code>).
+    User không phải gõ đúng format — app dùng kỳ hiện tại nếu Excel sai.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 14 — Email regex chặt hơn</h4>
+  <div class="ba-meta">File: <code>electron/modules/mappingValidator.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">const</span> EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+<span class="cm">// ⚠️ Accept: "a@b.c"  (TLD 1 ký tự)
+//         "a@b.1"  (TLD toàn số)
+//         "a@b..c" (double dot)
+// → Gửi email thất bại im lặng do SMTP reject</span></pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="cm">// TLD ≥ 2 ký tự chữ cái; không có segment rỗng</span>
+<span class="kw">const</span> EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-zA-Z]{2,}$/;
+
+<span class="cm">// ✓ "nguyen@gmail.com" — pass
+// ✓ "a.b@c.com.vn" — pass
+// ✗ "a@b.c"  — reject (TLD 1 ký tự)
+// ✗ "a@b.1"  — reject (TLD số)
+// ✗ "a@b..c" — reject (segment rỗng)</span></pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Email bẩn trong bảng lương lọt → SMTP reject, batch có failed mà không biết là do
+    data chứ không phải network. Regex mới enforce TLD ≥ 2 chữ cái và không cho segment rỗng. Vẫn không
+    check MX (cần DNS) — nhưng đủ để bắt lỗi đánh máy.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 15 — Exponential backoff cho retry</h4>
+  <div class="ba-meta">File: <code>electron/modules/emailSender.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">export async function</span> sendWithRetry(args) {
+  <span class="kw">const</span> maxAttempts = 2;
+  <span class="kw">for</span> (<span class="kw">let</span> attempt = 1; attempt &lt;= maxAttempts; attempt++) {
+    <span class="kw">try</span> { <span class="kw">await</span> sendOne(args); <span class="kw">return</span>; }
+    <span class="kw">catch</span> (e) {
+      lastError = e;
+      <span class="kw">if</span> (attempt &lt; maxAttempts) {
+        <span class="kw">await new</span> Promise((r) => setTimeout(r, 3000));
+        <span class="cm">// ⚠️ Fixed 3s — rate-limit hit → retry
+        // hammer ngay → rate-limit lại → fail</span>
+      }
+    }
+  }
+  <span class="kw">throw</span> lastError;
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">export async function</span> sendWithRetry(args) {
+  <span class="cm">// 2s → 6s. 3 lần thử tổng cộng.</span>
+  <span class="kw">const</span> delays = [2_000, 6_000];
+  <span class="kw">const</span> maxAttempts = delays.length + 1;
+  <span class="kw">for</span> (<span class="kw">let</span> attempt = 1; attempt &lt;= maxAttempts; attempt++) {
+    <span class="kw">try</span> { <span class="kw">await</span> sendOne(args); <span class="kw">return</span>; }
+    <span class="kw">catch</span> (e) {
+      lastError = e;
+      <span class="kw">if</span> (attempt &lt; maxAttempts) {
+        <span class="kw">await new</span> Promise((r) => setTimeout(r, delays[attempt - 1]));
+      }
+    }
+  }
+  <span class="kw">throw</span> lastError;
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Gmail SMTP có rate-limit ngắn — nếu retry ngay 3s sau, có khả năng vẫn bị reject. Chờ
+    lâu dần (2s → 6s) cho quota refill. Tăng lên 3 lần thử, tăng cơ hội thành công cho lỗi network thoáng
+    qua. Tổng thời gian tối đa mỗi email ~ 2s + 6s + (3×SMTP timeout) ≈ 2 phút, vẫn chấp nhận được.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 16 — Mã hoá log (email list + PII)</h4>
+  <div class="ba-meta">File: <code>electron/modules/settingsStore.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">export function</span> getLog(): LogEntry[] {
+  <span class="kw">return</span> (store.get(<span class="str">'log'</span>) ?? []).slice().reverse();
+}
+
+<span class="kw">export function</span> appendLog(entry: LogEntry) {
+  <span class="kw">const</span> cur = store.get(<span class="str">'log'</span>) ?? [];
+  cur.push(entry);
+  <span class="kw">if</span> (cur.length > 200) cur.shift();
+  store.set(<span class="str">'log'</span>, cur);
+  <span class="cm">// ⚠️ File phieu-luong-config.json plaintext
+  // Chứa: email list, hoTen, maNV, error chi tiết
+  // Ai đọc được disk → xem được toàn bộ lịch sử</span>
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">function</span> readRawLog(): LogEntry[] {
+  <span class="kw">const</span> b64 = store.get(<span class="str">'encryptedLog'</span>);
+  <span class="kw">if</span> (b64) {
+    <span class="kw">const</span> buf = Buffer.from(b64, <span class="str">'base64'</span>);
+    <span class="kw">return</span> JSON.parse(safeStorage.decryptString(buf));
+  }
+  <span class="cm">// Migration: log cũ plaintext → encrypt + xoá field cũ</span>
+  <span class="kw">const</span> legacy = store.get(<span class="str">'log'</span>);
+  <span class="kw">if</span> (legacy && Array.isArray(legacy)) {
+    writeRawLog(legacy);
+    store.delete(<span class="str">'log'</span>);
+    <span class="kw">return</span> legacy;
+  }
+  <span class="kw">return</span> [];
+}
+
+<span class="kw">function</span> writeRawLog(log: LogEntry[]) {
+  <span class="kw">const</span> enc = safeStorage.encryptString(JSON.stringify(log));
+  store.set(<span class="str">'encryptedLog'</span>, enc.toString(<span class="str">'base64'</span>));
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Log chứa PII (email, hoTen, maNV, error messages có thể lộ password). Encrypt bằng
+    <code>safeStorage</code> — cùng mechanism với Gmail password. Migration tự động: đọc <code>log</code>
+    cũ → ghi thành <code>encryptedLog</code> → xoá field cũ. Không mất log lịch sử. Fallback plaintext
+    nếu safeStorage không khả dụng (rare).
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 17 — Khoá settings khi đang gửi batch</h4>
+  <div class="ba-meta">Files: <code>electron/ipc/handlers.ts</code>, <code>src/screens/SetupScreen.tsx</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">let</span> cancelRequested = <span class="kw">false</span>;
+
+ipcMain.handle(<span class="str">'email:send-batch'</span>, <span class="kw">async</span> (…) => {
+  cancelRequested = <span class="kw">false</span>;
+  <span class="cm">// … gửi loop …</span>
+});
+
+ipcMain.handle(<span class="str">'settings:save'</span>, <span class="kw">async</span> (_e, s, pw, ts) => {
+  saveSettings(s, pw, ts);
+  <span class="cm">// ⚠️ Không check gì — đổi settings giữa batch</span>
+});</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">let</span> cancelRequested = <span class="kw">false</span>;
+<span class="kw">let</span> batchInProgress = <span class="kw">false</span>;
+
+ipcMain.handle(<span class="str">'email:send-batch'</span>, <span class="kw">async</span> (…) => {
+  <span class="kw">if</span> (batchInProgress)
+    <span class="kw">throw new</span> Error(<span class="str">'Một đợt gửi khác đang chạy…'</span>);
+  batchInProgress = <span class="kw">true</span>;
+  <span class="kw">try</span> {
+    <span class="cm">// … gửi loop …</span>
+  } <span class="kw">finally</span> {
+    batchInProgress = <span class="kw">false</span>;
+  }
+});
+
+ipcMain.handle(<span class="str">'settings:save'</span>, <span class="kw">async</span> (_e, s, pw, ts) => {
+  <span class="kw">if</span> (batchInProgress)
+    <span class="kw">throw new</span> Error(<span class="str">'Đang có đợt gửi — đợi xong rồi sửa.'</span>);
+  saveSettings(s, pw, ts);
+});
+<span class="cm">// SetupScreen catch + show red banner</span></pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Flag in-memory <code>batchInProgress</code> cleared trong <code>finally</code> nên
+    không kẹt. Chặn cả 2 chiều: (a) double-send batch khi có batch khác đang chạy, (b) đổi settings
+    khi batch đang gửi. SetupScreen nhận error → show banner đỏ với thông báo rõ. Cũng bảo vệ checkpoint
+    integrity — settings trong checkpoint không bị đổi giữa chừng.
+  </div>
+</div>
+
+<h2>5. Before / After — 5 QA hardening card = 8 issue (round 2, 2026-04-22)</h2>
+
+<p style="color:var(--muted); margin-top:8px;">
+  Round 1 cover 17 gap về flow/product. Round 2 sau QA test trực tiếp API (curl + headless browser) bắt
+  <b>7 finding ban đầu + 1 bug mới phát hiện khi verify fix</b> — tổng 8 issue, gom vào 5 card vì có cặp cùng root cause.
+</p>
+
+<div style="overflow-x:auto; margin: 16px 0;">
+<table style="width:100%; border-collapse: collapse; font-size: 13px; background: var(--surface); border-radius: 8px; overflow: hidden;">
+  <thead>
+    <tr style="background: rgba(56,189,248,0.15);">
+      <th style="padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); color: var(--accent);">Finding</th>
+      <th style="padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); color: var(--accent);">Triệu chứng</th>
+      <th style="padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); color: var(--accent);">Card xử lý</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);"><code>A01</code></td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);">Loading gate "Đang tải…" silent khi <code>window.api</code> mất</td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--green);">Gap 22</td></tr>
+    <tr><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);"><code>A02</code></td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);">Promise rejection swallow trong bootstrap IIFE</td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--green);">Gap 22 (gộp)</td></tr>
+    <tr><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);"><code>T01</code></td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);">POST /api/opens malformed JSON → 500 FUNCTION_INVOCATION_FAILED</td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--green);">Gap 21</td></tr>
+    <tr><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);"><code>T02</code></td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);">OPTIONS preflight → 405 (break CORS từ browser)</td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--green);">Gap 18</td></tr>
+    <tr><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);"><code>T03</code></td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);">GET /api/opens ≥1000 tokens → HTTP 431 (URL quá dài)</td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--green);">Gap 20 (client chunk, tránh GET)</td></tr>
+    <tr><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);"><code>T04</code></td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);">Pixel accept mọi HTTP method → count inflate</td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--green);">Gap 19</td></tr>
+    <tr><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);"><code>T05</code></td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border);">Error text "FUNCTION_INVOCATION_FAILED" không thân thiện</td><td style="padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--green);">Gap 21 (gộp với T01)</td></tr>
+    <tr><td style="padding: 8px 14px;"><code style="background: rgba(239,68,68,0.15); color: #fca5a5;">NEW</code></td><td style="padding: 8px 14px;">Silent truncation ở 500 tokens — data bug câm, phát hiện khi verify</td><td style="padding: 8px 14px; color: var(--green);">Gap 20</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 18 — OPTIONS preflight trả 204 cho CORS</h4>
+  <div class="ba-meta">File: <code>phieu-luong-tracker/api/opens.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="cm">// Handler chỉ accept GET/POST</span>
+<span class="kw">if</span> (req.method === <span class="str">'GET'</span>) { <span class="cm">/* … */</span> }
+<span class="kw">else if</span> (req.method === <span class="str">'POST'</span>) { <span class="cm">/* … */</span> }
+<span class="kw">else</span> {
+  res.status(405).json({ error: <span class="str">'method not allowed'</span> });
+  <span class="kw">return</span>;
+}
+<span class="cm">// ⚠️ OPTIONS (preflight CORS) → 405
+// → Browser block mọi POST từ origin khác
+// Bất kỳ dashboard/embed web nào đều fail
+// khi app Electron không dùng vì có IPC</span></pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">function</span> setCors(res) {
+  res.setHeader(<span class="str">'Access-Control-Allow-Origin'</span>, <span class="str">'*'</span>);
+  res.setHeader(<span class="str">'Access-Control-Allow-Methods'</span>, <span class="str">'GET, POST, OPTIONS'</span>);
+  res.setHeader(<span class="str">'Access-Control-Allow-Headers'</span>, <span class="str">'Content-Type, Authorization'</span>);
+  res.setHeader(<span class="str">'Access-Control-Max-Age'</span>, <span class="str">'86400'</span>);
+}
+
+<span class="kw">export default async function</span> handler(req, res) {
+  setCors(res);
+  <span class="kw">if</span> (req.method === <span class="str">'OPTIONS'</span>) {
+    res.status(204).end();
+    <span class="kw">return</span>;
+  }
+  <span class="cm">// … auth + body handling như cũ</span>
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Browser CORS spec yêu cầu OPTIONS preflight trả 2xx trước khi cho POST cross-origin
+    với <code>Content-Type: application/json</code>. App hiện tại là Electron (dùng IPC, không qua CORS),
+    nên bug latent. Fix trước bây giờ để tương lai có thêm web dashboard hay embed, không phải sửa endpoint
+    lúc đó. <code>Max-Age: 86400</code> giúp browser cache preflight 1 ngày, giảm latency.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 19 — Pixel chỉ đếm khi GET</h4>
+  <div class="ba-meta">File: <code>phieu-luong-tracker/api/t/[token].ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">export default async function</span> handler(req, res) {
+  <span class="kw">const</span> rawToken = req.query.token;
+  <span class="cm">// ⚠️ Không check method — POST/PUT/DELETE/HEAD
+  // đều log + increment counter
+  // Uptime monitor dùng HEAD ping mỗi phút
+  // → inflated count, firstAt/lastAt sai lệch</span>
+  <span class="kw">const</span> cleanToken = (token ?? <span class="str">''</span>).replace(/\.gif$/i, <span class="str">''</span>);
+  <span class="cm">// … log to Redis …</span>
+  sendGif(res);
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">export default async function</span> handler(req, res) {
+  <span class="cm">// Always return GIF so &lt;img&gt; fallback không gãy,
+  // nhưng chỉ GET mới count là "open"
+  // HEAD/POST/etc. = monitoring/prefetch/fuzz → ignore</span>
+  <span class="kw">if</span> (req.method !== <span class="str">'GET'</span>) {
+    sendGif(res);
+    <span class="kw">return</span>;
+  }
+
+  <span class="kw">const</span> rawToken = req.query.token;
+  <span class="cm">// … validate + log + sendGif như cũ …</span>
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Tracking pixel luôn được mail client load bằng GET (thẻ <code>&lt;img&gt;</code>). Bất kỳ method
+    nào khác đều là bot/monitor/fuzz — không phải user mở email. Count trước đây bị nhiễu bởi uptime monitor hay
+    Vercel internal probes. Sau fix, count = số lần mail client thực sự render ảnh. Verify: POST + PUT tới pixel
+    vẫn trả 200 GIF (không gãy UI email) nhưng Redis counter không tăng.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 20 — Token limit 500: server 413 + client chunk</h4>
+  <div class="ba-meta">
+    Files: <code>phieu-luong-tracker/api/opens.ts</code>, <code>electron/ipc/handlers.ts</code>
+  </div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="cm">// Server: opens.ts</span>
+<span class="kw">if</span> (tokens.length > 500) tokens = tokens.slice(0, 500);
+<span class="cm">// ⚠️ Cắt câm — token 501+ mất tích không warning
+// User có 600 NV → chỉ thấy 500 người đã mở,
+// 100 người còn lại hiện "chưa mở" dù đã mở
+
+// Client: handlers.ts</span>
+<span class="kw">const</span> resp = <span class="kw">await</span> fetch(url, {
+  method: <span class="str">'POST'</span>,
+  body: JSON.stringify({ tokens }), <span class="cm">// gửi hết một lần</span>
+});</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="cm">// Server: trả 413 rõ ràng, không cắt câm</span>
+<span class="kw">if</span> (tokens.length > MAX_TOKENS) {
+  res.status(413).json({
+    error: `too many tokens (max ${MAX_TOKENS})`,
+    maxTokens: MAX_TOKENS,
+    received: tokens.length,
+    hint: <span class="str">'Chunk your request client-side into batches of 500 or fewer.'</span>,
+  });
+  <span class="kw">return</span>;
+}
+
+<span class="cm">// Client: chunk 400/batch (headroom 100)</span>
+<span class="kw">const</span> CHUNK = 400;
+<span class="kw">const</span> merged = {};
+<span class="kw">for</span> (<span class="kw">let</span> i = 0; i &lt; tokens.length; i += CHUNK) {
+  <span class="kw">const</span> batch = tokens.slice(i, i + CHUNK);
+  <span class="kw">const</span> resp = <span class="kw">await</span> fetch(url, {
+    method: <span class="str">'POST'</span>,
+    body: JSON.stringify({ tokens: batch }),
+  });
+  <span class="cm">// … check resp.ok, gộp data.tokens vào merged …</span>
+}
+<span class="kw">return</span> { ok: <span class="kw">true</span>, tokens: merged };</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Silent truncation là dạng data bug tệ nhất — không ai biết nó xảy ra tới khi user phàn nàn.
+    Hai lớp phòng ngự: (1) server từ chối rõ ràng với 413 + hint, (2) client chunk 400/batch chủ động để
+    không bao giờ chạm giới hạn. CHUNK=400 để có headroom 100 token nếu sau này giảm MAX_TOKENS. Verify:
+    POST 600 tokens → 413 với JSON error chi tiết; POST 500 tokens → 200 trả đủ 500 kết quả; client query
+    2000 tokens → 5 batch, merge correctly.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 21 — Malformed JSON → 400 (một phần)</h4>
+  <div class="ba-meta">File: <code>phieu-luong-tracker/api/opens.ts</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre><span class="kw">if</span> (req.method === <span class="str">'POST'</span>) {
+  <span class="kw">const</span> body = req.body;
+  <span class="kw">if</span> (body && Array.isArray(body.tokens)) {
+    tokens = body.tokens.map(String);
+  }
+}
+<span class="cm">// ⚠️ Vercel parse JSON trước khi handler chạy.
+// Body hỏng → Vercel throw → HTTP 500
+// "FUNCTION_INVOCATION_FAILED"
+// → pollute error logs, mask outage thật</span></pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre><span class="kw">function</span> parseBodyTokens(body) {
+  <span class="kw">let</span> value = body;
+  <span class="kw">if</span> (<span class="kw">typeof</span> value === <span class="str">'string'</span>) {
+    <span class="kw">const</span> trimmed = value.trim();
+    <span class="kw">if</span> (trimmed.length === 0) <span class="kw">return</span> { ok: <span class="kw">true</span>, tokens: [] };
+    <span class="kw">try</span> { value = JSON.parse(trimmed); }
+    <span class="kw">catch</span> { <span class="kw">return</span> { ok: <span class="kw">false</span>, reason: <span class="str">'invalid_json'</span> }; }
+  }
+  <span class="cm">// … extract tokens array …</span>
+}
+
+<span class="kw">const</span> parsed = parseBodyTokens(req.body);
+<span class="kw">if</span> (!parsed.ok) {
+  res.status(400).json({ error: <span class="str">'invalid JSON body'</span> });
+  <span class="kw">return</span>;
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> <code>@vercel/node</code> 3.x tự parse JSON trước khi handler chạy, không có opt-out
+    (<code>bodyParser: false</code> chỉ là Next.js option). Fix cover case <code>Content-Type: text/plain</code>
+    hoặc bỏ header (req.body là string → parse manual). Case <code>Content-Type: application/json</code> +
+    malformed thì Vercel vẫn throw 500 — đây là giới hạn platform, không fix được ở handler level. App chính
+    luôn gửi JSON hợp lệ nên không user-facing. Comment trong code giải thích rõ để tương lai không ai
+    tưởng đây là bug có thể fix.
+  </div>
+</div>
+
+<div class="ba-card">
+  <h4>✓ Gap 22 — App bootstrap error panel + retry</h4>
+  <div class="ba-meta">File: <code>phieu-luong-app/src/App.tsx</code></div>
+  <div class="ba-grid">
+    <div class="ba-col before">
+      <div class="ba-col-head">❌ Before</div>
+<pre>useEffect(() => {
+  (async () => {
+    <span class="kw">const</span> { settings: s, … } = <span class="kw">await</span> api().settings.get();
+    setSettings(s); <span class="cm">/* … */</span>
+    setRoute({ name: <span class="str">'home'</span> });
+  })();
+  <span class="cm">// ⚠️ IIFE không có .catch
+  // → TypeError bị swallow im lặng
+  // → route kẹt ở 'loading' = "Đang tải…"
+  //    xám vô hạn, không có cách thoát</span>
+}, []);
+
+<span class="kw">if</span> (route.name === <span class="str">'loading'</span>) {
+  <span class="kw">return</span> &lt;<span class="kw">div</span>&gt;Đang tải…&lt;/<span class="kw">div</span>&gt;;
+}</pre>
+    </div>
+    <div class="ba-col after">
+      <div class="ba-col-head">✓ After</div>
+<pre>useEffect(() => {
+  <span class="kw">let</span> cancelled = <span class="kw">false</span>;
+  (async () => {
+    <span class="kw">try</span> {
+      <span class="kw">if</span> (!(<span class="kw">window as any</span>).api) {
+        <span class="kw">throw new</span> Error(<span class="str">'window.api không khả dụng — …'</span>);
+      }
+      <span class="kw">const</span> { settings: s, … } = <span class="kw">await</span> api().settings.get();
+      <span class="kw">if</span> (cancelled) <span class="kw">return</span>;
+      <span class="cm">/* … setSettings, setRoute('home') … */</span>
+    } <span class="kw">catch</span> (e) {
+      console.error(<span class="str">'[bootstrap] failed:'</span>, e);
+      setBootError(e.message);
+    }
+  })();
+  <span class="kw">return</span> () => { cancelled = <span class="kw">true</span>; };
+}, []);
+
+<span class="kw">if</span> (route.name === <span class="str">'loading'</span>) {
+  <span class="kw">if</span> (bootError) <span class="kw">return</span> &lt;<span class="kw">ErrorPanel</span> message={bootError}
+    onRetry={() => location.reload()} /&gt;;
+  <span class="kw">return</span> &lt;<span class="kw">div</span>&gt;Đang tải…&lt;/<span class="kw">div</span>&gt;;
+}</pre>
+    </div>
+  </div>
+  <div class="ba-why">
+    <b>Tại sao:</b> Trong production (Electron wrapper) <code>window.api</code> luôn có sẵn nên loading gate
+    không stuck. Nhưng nếu preload script fail (build lỗi, Electron upgrade, macOS policy…), user thấy
+    màn xám câm với "Đang tải…" — zero diagnostics, không retry. Fix: detect window.api sớm, catch mọi
+    lỗi bootstrap, hiện panel đỏ kèm nút "Thử lại" reload page. Cờ <code>cancelled</code> tránh setState
+    trên component đã unmount. Verify bằng cách mở Vite URL trực tiếp (ngoài Electron) — panel hiện ngay
+    với hint rõ ràng "chạy <code>npm run dev</code> để mở cửa sổ Electron".
+  </div>
+</div>
+
+<p style="color:var(--muted); margin-top:48px; font-size:13px; text-align:center;">
+  Updated 2026-04-22 · 17 gap gốc + 5 QA hardening · type-check pass cả 3 project
+</p>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    flowchart: { curve: 'basis', padding: 20, nodeSpacing: 50, rankSpacing: 60 },
+    themeVariables: { fontSize: '14px' }
+  });
+</script>
+
+</body>
+</html>

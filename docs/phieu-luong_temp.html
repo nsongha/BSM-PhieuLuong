@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phiếu lương — Tháng 04/2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0f1419;
+    --ink-soft: #3a4149;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --line-strong: #111827;
+    --paper: #ffffff;
+    --paper-tint: #fafaf7;
+    --accent: #b91c1c;
+    --positive: #065f46;
+    --negative: #991b1b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: #ececea;
+    color: var(--ink);
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .page {
+    max-width: 560px;
+    margin: 24px auto;
+    background: var(--paper);
+    padding: 32px 28px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+    position: relative;
+  }
+
+  /* ===== Header ===== */
+  .masthead {
+    border-bottom: 2px solid var(--line-strong);
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+  }
+
+  .masthead-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .company {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .company-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+
+  .doc-meta {
+    text-align: right;
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .doc-meta strong {
+    display: block;
+    color: var(--ink);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  .title-block {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .title {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .period {
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* ===== Employee info ===== */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 24px;
+    padding: 14px 0 20px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 20px;
+  }
+
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .info-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .info-value {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+
+  .info-value.code {
+    font-family: 'Fira Code', monospace;
+    font-weight: 400;
+  }
+
+  /* ===== Section ===== */
+  .section {
+    margin-bottom: 20px;
+  }
+
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 10px;
+  }
+
+  .section-title {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .section-hint {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'Fira Code', monospace;
+  }
+
+  /* ===== Rows ===== */
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    padding: 6px 0;
+    align-items: baseline;
+  }
+
+  .row-label {
+    color: var(--ink-soft);
+  }
+
+  .row-label .note {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+    font-family: 'Fira Code', monospace;
+  }
+
+  .row-amount {
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .row-amount.neg {
+    color: var(--negative);
+  }
+
+  .subtotal {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    padding: 10px 0 4px;
+    border-top: 1px dashed var(--line);
+    margin-top: 4px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .subtotal .amount {
+    font-family: 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== Total ===== */
+  .total-block {
+    margin-top: 28px;
+    padding: 20px 0;
+    border-top: 2px solid var(--line-strong);
+    border-bottom: 2px solid var(--line-strong);
+  }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  .total-label {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+  }
+
+  .total-amount {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .total-words {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* ===== Section divider (giữa Phiếu lương và Bảng công) ===== */
+  .section-divider {
+    margin: 36px -28px 28px;
+    position: relative;
+    text-align: center;
+  }
+
+  .section-divider::before,
+  .section-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: calc(50% - 80px);
+    height: 0;
+    border-top: 1px solid var(--ink);
+  }
+
+  .section-divider::before { left: 0; }
+  .section-divider::after { right: 0; }
+
+  .section-divider-mark {
+    display: inline-block;
+    font-family: 'Fira Code', monospace;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--paper);
+    padding: 0 12px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .section-divider-mark::before {
+    content: '◆';
+    margin-right: 8px;
+    color: var(--accent);
+  }
+
+  .section-divider-mark::after {
+    content: '◆';
+    margin-left: 8px;
+    color: var(--accent);
+  }
+
+  /* ===== Detail breakdown ===== */
+  .breakdown {
+    background: var(--paper-tint);
+    margin: 0 -28px;
+    padding: 24px 28px 8px;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .breakdown-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+
+  .breakdown-title {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-transform: none;
+  }
+
+  .breakdown-subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    font-style: italic;
+  }
+
+  .breakdown-hint {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'Fira Code', monospace;
+  }
+
+  .detail-group {
+    margin-bottom: 14px;
+  }
+
+  .detail-group-title {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .detail-group-count {
+    font-family: 'Fira Code', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: 0.04em;
+  }
+
+  .detail-table {
+    width: 100%;
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    border-collapse: collapse;
+  }
+
+  .detail-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--muted);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 6px 4px 0;
+    border-bottom: 1px dotted var(--line);
+  }
+
+  .detail-table th.num {
+    text-align: right;
+    padding-right: 0;
+  }
+
+  .detail-table td {
+    padding: 3px 6px 3px 0;
+    color: var(--ink-soft);
+    line-height: 1.4;
+    vertical-align: top;
+  }
+
+  .detail-table td.num {
+    text-align: right;
+    padding-right: 0;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .detail-table td.neg {
+    color: var(--negative);
+  }
+
+  .detail-table td.date {
+    color: var(--ink);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .detail-group-total {
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 8px;
+    padding-top: 6px;
+    margin-top: 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .detail-group-total .label {
+    color: var(--muted);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .detail-group-total .amount {
+    color: var(--ink);
+    font-weight: 500;
+    border-top: 1px solid var(--ink);
+    padding-top: 4px;
+    min-width: 80px;
+    text-align: right;
+    margin-top: -4px;
+  }
+
+  .detail-group-total .amount.neg {
+    color: var(--negative);
+  }
+
+  /* ===== Benefits / Quyền lợi ===== */
+  .benefits {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .benefit-card {
+    border: 1px solid var(--line);
+    padding: 12px 14px;
+    background: var(--paper);
+  }
+
+  .benefit-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+
+  .benefit-label {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+  }
+
+  .benefit-period {
+    font-family: 'Fira Code', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .benefit-stat {
+    font-family: 'Fira Code', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    margin-bottom: 2px;
+  }
+
+  .benefit-stat .total {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .benefit-stat .unit {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 2px;
+  }
+
+  .benefit-bar {
+    height: 3px;
+    background: var(--line);
+    margin-top: 8px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .benefit-bar-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: var(--ink);
+  }
+
+  .benefit-bar-fill.warn {
+    background: var(--accent);
+  }
+
+  .benefit-used {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'Fira Code', monospace;
+    line-height: 1.5;
+  }
+
+  .benefit-used strong {
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+
+  /* ===== Footer ===== */
+
+  .disclaimer {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    letter-spacing: 0.02em;
+  }
+
+  /* ===== Mobile ===== */
+  @media (max-width: 600px) {
+    body { font-size: 13px; }
+    .page {
+      margin: 0;
+      padding: 20px 16px;
+      box-shadow: none;
+      max-width: 100%;
+    }
+    .title { font-size: 22px; }
+    .total-amount { font-size: 24px; }
+    .info-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .masthead-top {
+      flex-direction: column;
+      gap: 8px;
+    }
+    .doc-meta {
+      text-align: left;
+    }
+    .detail-table {
+      font-size: 10px;
+    }
+    .detail-table th,
+    .detail-table td {
+      padding-right: 4px;
+    }
+    .breakdown {
+      margin: 0 -16px;
+      padding: 20px 16px 4px;
+    }
+    .section-divider {
+      margin: 28px -16px 20px;
+    }
+    .benefits {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+  }
+
+  /* ===== Print: A5 ===== */
+  @page {
+    size: A5;
+    margin: 10mm;
+  }
+
+  @media print {
+    html, body { background: white; }
+    body { font-size: 10pt; }
+    .page {
+      margin: 0;
+      padding: 0;
+      max-width: 100%;
+      box-shadow: none;
+    }
+    .title { font-size: 18pt; }
+    .total-amount { font-size: 20pt; }
+    .section { margin-bottom: 12px; }
+    .total-block { margin-top: 16px; padding: 12px 0; }
+    .breakdown {
+      margin: 0 -10mm;
+      padding: 12px 10mm 6px;
+      background: white;
+      border-top: 1.5pt solid black;
+      page-break-before: auto;
+    }
+    .section-divider {
+      margin: 16px -10mm 12px;
+      page-break-before: avoid;
+    }
+    .section-divider-mark {
+      background: white;
+      font-size: 7pt;
+    }
+    .detail-table { font-size: 8.5pt; }
+    .detail-group { margin-bottom: 10px; }
+    .benefits { gap: 8px; margin-bottom: 10px; }
+    .benefit-card { padding: 8px 10px; }
+    .benefit-stat { font-size: 14pt; }
+    .no-print { display: none; }
+  }
+
+  /* Print button */
+  .print-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--ink);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 2px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    letter-spacing: 0.02em;
+  }
+
+  .print-btn:hover { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Masthead -->
+  <header class="masthead">
+    <div class="masthead-top">
+      <div>
+        <div class="company">BSMlabs Co., Ltd.</div>
+        <div class="company-sub">Địa chỉ · MST · Số điện thoại</div>
+      </div>
+      <div class="doc-meta">
+        Số phiếu
+        <strong>PL-2026-04-001</strong>
+      </div>
+    </div>
+    <div class="title-block">
+      <h1 class="title">Phiếu lương</h1>
+      <div class="period">Kỳ 04 / 2026</div>
+    </div>
+  </header>
+
+  <!-- Employee Info -->
+  <section class="info-grid">
+    <div class="info-item">
+      <span class="info-label">Họ và tên</span>
+      <span class="info-value">Trần Minh Khôi</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Mã nhân viên</span>
+      <span class="info-value code">BSM-0118</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Chức danh</span>
+      <span class="info-value">Frontend Developer</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Phòng ban</span>
+      <span class="info-value">Engineering</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Ngày công chuẩn</span>
+      <span class="info-value code">22 ngày · 176h</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Ngày công thực tế</span>
+      <span class="info-value code">22 ngày · 176h</span>
+    </div>
+  </section>
+
+  <!-- Thu nhập -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-title">Thu nhập</span>
+      <span class="section-hint">(+)</span>
+    </div>
+
+    <div class="row">
+      <div class="row-label">Lương cơ bản theo hợp đồng</div>
+      <div class="row-amount">12,000,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Phụ cấp ăn trưa
+      </div>
+      <div class="row-amount">730,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Phụ cấp trang phục
+      </div>
+      <div class="row-amount">400,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Phụ cấp điện thoại
+      </div>
+      <div class="row-amount">500,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Lương hiệu suất
+      </div>
+      <div class="row-amount">1,500,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Lương làm thêm giờ
+        <span class="note">8h × 1.5 × 68,182đ</span>
+      </div>
+      <div class="row-amount">818,184</div>
+    </div>
+
+    <div class="subtotal">
+      <span>Tổng thu nhập</span>
+      <span class="amount">15,948,184</span>
+    </div>
+  </section>
+
+  <!-- Khấu trừ -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-title">Các khoản khấu trừ</span>
+      <span class="section-hint">(−)</span>
+    </div>
+
+    <div class="row">
+      <div class="row-label">
+        Đóng góp trách nhiệm
+        <span class="note">2h giờ công thiếu × 68,182đ</span>
+      </div>
+      <div class="row-amount neg">−136,364</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Bảo hiểm xã hội (8%)
+      </div>
+      <div class="row-amount neg">−960,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Bảo hiểm y tế (1.5%)
+      </div>
+      <div class="row-amount neg">−180,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Bảo hiểm thất nghiệp (1%)
+      </div>
+      <div class="row-amount neg">−120,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Thuế thu nhập cá nhân
+        <span class="note">sau giảm trừ gia cảnh</span>
+      </div>
+      <div class="row-amount neg">−180,000</div>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        Tạm ứng kỳ trước
+      </div>
+      <div class="row-amount neg">−1,000,000</div>
+    </div>
+
+    <div class="subtotal">
+      <span>Tổng khấu trừ</span>
+      <span class="amount">−2,576,364</span>
+    </div>
+  </section>
+
+  <!-- Total -->
+  <div class="total-block">
+    <div class="total-row">
+      <span class="total-label">Thực nhận</span>
+      <span class="total-amount">13,371,820 ₫</span>
+    </div>
+    <div class="total-words">
+      Bằng chữ: Mười ba triệu, ba trăm bảy mươi mốt nghìn, tám trăm hai mươi đồng.
+    </div>
+  </div>
+
+  <!-- ===== SECTION DIVIDER ===== -->
+  <div class="section-divider">
+    <span class="section-divider-mark">Phụ lục</span>
+  </div>
+
+  <!-- Detail breakdown -->
+  <section class="breakdown">
+    <div class="breakdown-head">
+      <span class="breakdown-title">Chi tiết bảng công</span>
+      <span class="breakdown-hint">Phụ lục đối chiếu</span>
+    </div>
+    <div class="breakdown-subtitle">
+      Diễn giải các khoản phát sinh trong kỳ — dùng để hai bên đối chiếu và xác nhận.
+    </div>
+
+    <!-- Đóng góp trách nhiệm (chi tiết giờ công thiếu) -->
+    <div class="detail-group">
+      <div class="detail-group-title">
+        <span>Đóng góp trách nhiệm</span>
+        <span class="detail-group-count">2 lần · 2h</span>
+      </div>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th style="width: 18%">Ngày</th>
+            <th style="width: 28%">Thời gian</th>
+            <th>Ghi chú</th>
+            <th class="num">Thành tiền</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="date">08/04 T3</td>
+            <td>Đi muộn 45 phút</td>
+            <td>Vào lúc 09:45</td>
+            <td class="num neg">−51,137</td>
+          </tr>
+          <tr>
+            <td class="date">22/04 T3</td>
+            <td>Về sớm 1h 15ph</td>
+            <td>Ra lúc 16:45</td>
+            <td class="num neg">−85,227</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="detail-group-total">
+        <span class="label">Tổng</span>
+        <span class="amount neg">−136,364</span>
+      </div>
+    </div>
+
+    <!-- Nghỉ phép / WFH trong kỳ -->
+    <div class="detail-group">
+      <div class="detail-group-title">
+        <span>Ngày nghỉ & WFH trong kỳ</span>
+        <span class="detail-group-count">4 ngày</span>
+      </div>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th style="width: 18%">Ngày</th>
+            <th style="width: 22%">Loại</th>
+            <th>Lý do / Ghi chú</th>
+            <th class="num">Tính lương</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="date">10/04 T5</td>
+            <td>WFH</td>
+            <td>Đã được duyệt qua Pyng</td>
+            <td class="num">Có</td>
+          </tr>
+          <tr>
+            <td class="date">15/04 T3</td>
+            <td>Phép năm</td>
+            <td>Việc gia đình</td>
+            <td class="num">Có</td>
+          </tr>
+          <tr>
+            <td class="date">17/04 T5</td>
+            <td>WFH</td>
+            <td>Đã được duyệt qua Pyng</td>
+            <td class="num">Có</td>
+          </tr>
+          <tr>
+            <td class="date">24/04 T5</td>
+            <td>WFH</td>
+            <td>Đã được duyệt qua Pyng</td>
+            <td class="num">Có</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="detail-group">
+      <div class="detail-group-title">
+        <span>Quyền lợi còn lại</span>
+        <span class="detail-group-count">Tính đến 30/04/2026</span>
+      </div>
+
+      <div class="benefits">
+        <!-- Phép năm -->
+        <div class="benefit-card">
+          <div class="benefit-head">
+            <span class="benefit-label">Phép năm</span>
+            <span class="benefit-period">Năm 2026</span>
+          </div>
+          <div class="benefit-stat">
+            10<span class="unit">ngày</span> <span class="total">/ 12</span>
+          </div>
+          <div class="benefit-bar">
+            <div class="benefit-bar-fill" style="width: 16.67%"></div>
+          </div>
+          <div class="benefit-used">
+            Đã dùng <strong>2 ngày</strong> ·
+            22/01, 15/04
+          </div>
+        </div>
+
+        <!-- WFH -->
+        <div class="benefit-card">
+          <div class="benefit-head">
+            <span class="benefit-label">WFH đã dùng</span>
+            <span class="benefit-period">Tháng 04/2026</span>
+          </div>
+          <div class="benefit-stat">
+            3<span class="unit">ngày</span>
+          </div>
+          <div class="benefit-used" style="margin-top: 8px;">
+            10/04, 17/04, 24/04
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="disclaimer">
+    Phiếu lương được phát hành theo quy định tại Điều 95 Bộ luật Lao động 2019.<br>
+    Mọi thắc mắc về các khoản trên vui lòng phản hồi email này hoặc liên hệ Phòng Nhân sự trong vòng 07 ngày kể từ ngày nhận.
+  </div>
+
+</div>
+
+<button class="print-btn no-print" onclick="window.print()">In phiếu · A5</button>
+
+</body>
+</html>
