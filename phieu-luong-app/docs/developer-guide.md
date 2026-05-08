@@ -121,7 +121,6 @@ phieu-luong-app/
 │   └── developer-guide.md       # Hướng dẫn phát triển
 │
 ├── assets/
-│   ├── icon.icns                # App icon macOS
 │   └── qpdf-win/                # qpdf binary bundled cho Windows build
 │
 ├── index.html                   # Vite HTML entry
