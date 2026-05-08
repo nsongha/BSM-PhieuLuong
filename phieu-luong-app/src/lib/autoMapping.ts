@@ -208,7 +208,25 @@ export function autoDetectMapping(headers: string[]): {
     }
   }
 
+  // Sắp xếp thu nhập theo nhóm: lương → thưởng → phụ cấp/hỗ trợ → OT → bổ sung → bonus → KPI
+  mapping.thuNhap.sort((a, b) => incomeOrder(a.nhan) - incomeOrder(b.nhan));
+
   return { mapping, complete: missing.length === 0, missing };
+}
+
+function incomeOrder(name: string): number {
+  const n = name.toLowerCase();
+  if (/lương\s*cơ\s*bản|luong\s*co\s*ban|basic\s*salary/.test(n)) return 10;
+  if (/^lương|^luong|salary/.test(n)) return 15;
+  if (/thưởng|thuong/.test(n)) return 20;
+  if (/xăng|xang|đồng\s*phục|dong\s*phuc/.test(n)) return 30;
+  if (/hỗ\s*trợ|ho\s*tro|phụ\s*cấp|phu\s*cap|trợ\s*cấp|tro\s*cap|allowance/.test(n)) return 31;
+  if (/ot|overtime|thêm\s*giờ|them\s*gio/.test(n)) return 40;
+  if (/bổ\s*sung|bo\s*sung/.test(n)) return 50;
+  if (/incentive|power\s*up/.test(n)) return 60;
+  if (/bonus|tháng\s*13|thang\s*13/.test(n)) return 70;
+  if (/kpi/.test(n)) return 80;
+  return 90;
 }
 
 function labelOf(f: keyof Mapping): string {
