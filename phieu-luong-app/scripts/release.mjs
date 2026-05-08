@@ -3,27 +3,37 @@
  * Release script: bump version → build → tạo GitHub Release
  * Dùng: npm run release [patch|minor|major]
  * Mặc định: patch
+ *
+ * Quản lý 2 file version song song:
+ *   - package.json  → semver 3-digit (0.1.0)   dùng cho electron-updater
+ *   - VERSION       → 4-digit     (0.1.0.0)     dùng cho gstack-ship
  */
 
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const pkgPath = resolve(__dir, '../package.json');
+const root = resolve(__dir, '..');
+const pkgPath = resolve(root, 'package.json');
+const versionPath = resolve(root, 'VERSION');
 
-// --- Helpers ---
 function run(cmd, opts = {}) {
   console.log(`▶ ${cmd}`);
   execSync(cmd, { stdio: 'inherit', ...opts });
 }
 
-function bumpVersion(current, level) {
+function bumpSemver(current, level) {
   const [major, minor, patch] = current.split('.').map(Number);
   if (level === 'major') return `${major + 1}.0.0`;
   if (level === 'minor') return `${major}.${minor + 1}.0`;
   return `${major}.${minor}.${patch + 1}`;
+}
+
+// Đồng bộ VERSION file (4-digit) từ semver (3-digit)
+function toFourDigit(semver) {
+  return `${semver}.0`;
 }
 
 // --- Main ---
@@ -35,27 +45,32 @@ if (!['patch', 'minor', 'major'].includes(bumpLevel)) {
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const oldVersion = pkg.version;
-const newVersion = bumpVersion(oldVersion, bumpLevel);
+const newVersion = bumpSemver(oldVersion, bumpLevel);
+const newVersionFour = toFourDigit(newVersion);
 
 console.log(`\n🚀 Release: v${oldVersion} → v${newVersion} (${bumpLevel})\n`);
 
-// 1. Bump version trong package.json
+// 1. Bump package.json
 pkg.version = newVersion;
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-console.log(`✅ package.json: ${oldVersion} → ${newVersion}\n`);
+console.log(`✅ package.json: ${oldVersion} → ${newVersion}`);
 
-// 2. Build
+// 2. Sync VERSION file (giữ gstack-ship không tự override)
+writeFileSync(versionPath, newVersionFour + '\n');
+console.log(`✅ VERSION:      ${toFourDigit(oldVersion)} → ${newVersionFour}\n`);
+
+// 3. Build
 console.log('📦 Đang build...\n');
-run('npm run build:win', { cwd: resolve(__dir, '..') });
+run('npm run build:win', { cwd: root });
 
-// 3. Commit & tag
-run(`git add phieu-luong-app/package.json`);
+// 4. Commit & tag
+run(`git add phieu-luong-app/package.json phieu-luong-app/VERSION`);
 run(`git commit -m "chore: release v${newVersion}"`);
 run(`git tag v${newVersion}`);
 run(`git push && git push --tags`);
 
-// 4. Tạo GitHub Release + upload artifacts
-const releaseDir = resolve(__dir, '../release');
+// 5. Tạo GitHub Release + upload artifacts
+const releaseDir = resolve(root, 'release');
 const exeFile = `${releaseDir}/Phieu Luong Setup ${newVersion}.exe`;
 const latestYml = `${releaseDir}/latest.yml`;
 
