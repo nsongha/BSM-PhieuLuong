@@ -14,7 +14,10 @@
     "build:win": "npm run build:renderer && npm run build:electron && electron-builder --win",
     "build:all": "npm run build:renderer && npm run build:electron && electron-builder -mw",
     "seed-mockup": "node scripts/generate-mockup.mjs",
-    "test": "npm run build:electron && npx tsc --noEmit -p tsconfig.json && node scripts/smoke-test.mjs"
+    "test": "npm run build:electron && npx tsc --noEmit -p tsconfig.json && node scripts/smoke-test.mjs",
+    "release": "node scripts/release.mjs",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major"
   },
   "keywords": [
     "electron",
