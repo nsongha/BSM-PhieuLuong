@@ -8,11 +8,9 @@ npm run seed-mockup
 
 **Nội dung:**
 
-- 15 nhân viên hợp lệ với tên Việt thật, Mã NV, CCCD, các khoản lương/phụ cấp/khấu trừ/thực nhận
-- 3 edge cases cuối để test validation:
-  - Dòng thiếu Email
-  - Dòng Email sai format
-  - Dòng thiếu CCCD (password)
+- 15 nhân viên với tên Việt thật, Mã NV, CCCD, các khoản lương/phụ cấp/khấu trừ/thực nhận
+- 3 kỳ lương (mặc định) để kiểm tra tính năng chọn kỳ
+- Tất cả 15 dòng đều hợp lệ — để test validation lỗi, sửa thủ công một vài ô trong file Excel
 
 **Email:**
 - Mặc định dùng alias Gmail `nguyensongha2+01@gmail.com` → `nguyensongha2+15@gmail.com`
@@ -26,9 +24,9 @@ npm run seed-mockup
 3. Home → bật toggle "🧪 Chế độ test"
 4. Chọn Tháng/Năm, bấm "Kỳ lương mới"
 5. Chọn file `mockup/sample-payroll.xlsx`
-6. Mapping: cột sẽ tự match (Họ và tên, Email, Mã NV, CCCD, Thực nhận). Thêm các khoản thu nhập/khấu trừ tuỳ ý.
+6. Mapping: cột sẽ tự match (Họ và tên, Email, Mã NV, Thực nhận). CCCD có trong file nhưng không auto-match — thêm thủ công nếu muốn.
 7. Preview: check 15 hợp lệ + 3 lỗi. Click "Xem PDF" trên 1 dòng để verify layout.
-8. "Gửi thử" → 3 mail sẽ đến inbox Gmail của bạn — check layout + password (nhập CCCD để mở PDF).
+8. "Gửi thử" → 3 mail sẽ đến inbox Gmail của bạn — check layout + password (mã OTP 6 chữ số ghi trong nội dung email).
 9. "Gửi thật" (vẫn ở chế độ test → toàn bộ 15 mail về inbox của bạn).
 10. Khi chị đã quen, TẮT chế độ test, thay bằng file Excel thật.
 
