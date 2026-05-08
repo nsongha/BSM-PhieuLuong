@@ -82,6 +82,13 @@
             "x64"
           ]
         }
+      ],
+      "extraResources": [
+        {
+          "from": "assets/qpdf-win",
+          "to": "qpdf-win",
+          "filter": ["**/*"]
+        }
       ]
     },
     "nsis": {
