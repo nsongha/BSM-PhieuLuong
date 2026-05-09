@@ -162,6 +162,12 @@ function soThanhChu(n: number): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+function formatDateVN(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -284,23 +290,53 @@ function buildPhulucHtml(phuluc: Employee['phuluc'], monoFonts: string): string 
 }
 
 function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string {
-  const tongThuNhap = emp.thuNhap.reduce((s, i) => s + i.soTien, 0);
+  // Subtotals — ưu tiên giá trị đã tính sẵn từ Excel, fallback sang sum nếu thiếu.
+  const tongLuong = emp.tongLuong ?? emp.luong.reduce((s, i) => s + i.soTien, 0);
+  const tongLuongNgayCong = emp.tongLuongNgayCong ?? tongLuong;
+  const tongThuNhap = emp.tongThuNhap
+    ?? (tongLuongNgayCong + emp.thuNhapBoSung.reduce((s, i) => s + i.soTien, 0));
   const tongKhauTru = emp.khauTru.reduce((s, i) => s + i.soTien, 0);
   const tongNgoaiLuong = (emp.ngoaiLuong ?? []).reduce((s, i) => s + i.soTien, 0);
 
   const month = opts.month.padStart(2, '0');
-  const docId = `PL-${escapeHtml(opts.year)}-${month}-${escapeHtml(emp.maNV)}`;
+  const docIdSuffix = emp.maNV
+    ? escapeHtml(emp.maNV)
+    : String(emp.rowIndex + 1).padStart(3, '0');
+  const docId = `PL-${escapeHtml(opts.year)}-${month}-${docIdSuffix}`;
 
-  const thuNhapRows = emp.thuNhap
-    .map(i => {
-      const neg = i.soTien < 0;
-      return `
+  const renderIncomeRow = (i: { nhan: string; soTien: number; note?: string }) => {
+    const neg = i.soTien < 0;
+    return `
       <div class="row">
         <div class="row-label">${escapeHtml(i.nhan)}${i.note ? `<div class="note">${escapeHtml(i.note)}</div>` : ''}</div>
         <div class="row-amount${neg ? ' neg' : ''}">${neg ? '−' : ''}${formatCurrency(Math.abs(i.soTien))}</div>
       </div>`;
-    })
-    .join('');
+  };
+
+  const luongRows = emp.luong.map(renderIncomeRow).join('');
+  const thuNhapBoSungRows = emp.thuNhapBoSung.map(renderIncomeRow).join('');
+
+  // Bước ② — Tổng lương theo ngày công là tổng phụ chính của bảng Thu nhập.
+  // Bordered emphatic + formula note ngay dưới (gần baseline, cách dòng tiếp theo ra chút).
+  const hasNgayCongData =
+    emp.ngayCong != null && emp.ngayCongChuan != null && emp.ngayCongChuan > 0;
+  const ngayCongCalc = hasNgayCongData
+    ? `= ${tongLuong.toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ÷ ${emp.ngayCongChuan} × ${emp.ngayCong}`
+    : '';
+  const tongLuongNgayCongBlock = `
+      <div class="subtotal-bordered subtotal-bordered-step">
+        <div class="subtotal-bordered-inner">
+          <span class="label">Tổng lương theo ngày công:</span>
+          <span class="amount">${formatCurrency(tongLuongNgayCong)}</span>
+        </div>
+      </div>
+      <div class="formula-note">
+        ${ngayCongCalc ? `<span class="calc">${escapeHtml(ngayCongCalc)}</span>` : ''}
+        <span class="desc">(Tổng lương ÷ Ngày công chuẩn × Ngày công thực tế)</span>
+      </div>`;
+
+  const hasLuongStep = emp.luong.length > 0 || emp.tongLuong != null;
+  const hasBoSungStep = emp.thuNhapBoSung.length > 0;
 
   // Tách khấu trừ thành 2 phần: BHXH-style (trước thuế) và thuế (TNCN, lũy tiến…).
   // Mức giảm trừ NPT chèn giữa — vì nó dùng để tính thuế, đứng ngay trước Thuế TNCN.
@@ -322,11 +358,8 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
 
   const khauTruEmpty = !khauTruPreTax && !khauTruTax && !giamTruNPTHtml;
 
-  const tongThuNhapSauThueHtml = emp.tongThuNhapSauThue != null ? `
-  <div class="net-after-tax">
-    <span class="net-after-tax-label">Tổng thu nhập sau thuế</span>
-    <span class="net-after-tax-amount">${formatCurrency(emp.tongThuNhapSauThue)}</span>
-  </div>` : '';
+  // Tổng thu nhập sau thuế đã đổi tên là "Thu nhập sau thuế" và gộp vào cuối Bảng Khấu trừ.
+  const tongThuNhapSauThueHtml = '';
 
   const ngoaiLuongRows = (emp.ngoaiLuong ?? [])
     .map(i => {
@@ -340,6 +373,8 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     })
     .join('');
 
+  // Bảng Ngoài lương: chỉ hiển thị item có biến động (validator đã filter soTien !== 0).
+  // Không có subtotal — mỗi item đã rõ +/− và section hint là (±). Hide cả section nếu rỗng.
   const ngoaiLuongSection = (emp.ngoaiLuong ?? []).length > 0 ? `
   <section class="section">
     <div class="section-head">
@@ -347,41 +382,45 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
       <span class="section-hint">(±)</span>
     </div>
     ${ngoaiLuongRows}
-    <div class="subtotal">
-      <span class="label">Tổng cộng / trừ</span>
-      <span class="amount${tongNgoaiLuong < 0 ? '" style="color:var(--negative)' : ''}">${tongNgoaiLuong < 0 ? '−' : '+'}${formatCurrency(Math.abs(tongNgoaiLuong))}</span>
-    </div>
   </section>` : '';
 
-  const viTriHtml = emp.viTri ? `
-    <div class="info-item">
-      <span class="info-label">Chức danh</span>
-      <span class="info-value">${escapeHtml(emp.viTri)}</span>
-    </div>` : '';
+  // Info group 1: 4 ô fixed positions (top-left/top-right/bottom-left/bottom-right).
+  // Cell luôn render dù value rỗng → các ô khác giữ nguyên vị trí.
+  const hoTenCell = `
+    <div class="info-item info-cell-tl">
+      <span class="info-label">Họ và tên</span>
+      <span class="info-value">${escapeHtml(emp.hoTen)}</span>
+    </div>`;
 
-  const phongBanHtml = emp.phongBan ? `
-    <div class="info-item">
-      <span class="info-label">Phòng ban</span>
-      <span class="info-value">${escapeHtml(emp.phongBan)}</span>
-    </div>` : '';
+  const maNVCell = `
+    <div class="info-item info-cell-tr">
+      ${emp.maNV ? `<span class="info-label">Mã nhân viên</span>
+      <span class="info-value code">${escapeHtml(emp.maNV)}</span>` : ''}
+    </div>`;
 
-  const ngayCongHtml = emp.ngayCong != null ? `
-    <div class="info-item">
-      <span class="info-label">Ngày công TT</span>
-      <span class="info-value code">${emp.ngayCong} ngày</span>
-    </div>` : '';
+  const viTriCell = `
+    <div class="info-item info-cell-bl">
+      ${emp.viTri ? `<span class="info-label">Chức danh</span>
+      <span class="info-value">${escapeHtml(emp.viTri)}${emp.phongBan ? ` <span class="info-sub">· ${escapeHtml(emp.phongBan)}</span>` : ''}</span>` : ''}
+    </div>`;
 
-  const ngayCongChuanHtml = emp.ngayCongChuan != null ? `
-    <div class="info-item">
-      <span class="info-label">Ngày công chuẩn</span>
-      <span class="info-value code">${emp.ngayCongChuan} ngày</span>
-    </div>` : '';
-
-  // Email — render riêng để placement phía sau viTri/ngayCong (match v5 layout)
-  const emailHtml = `
-    <div class="info-item">
+  const emailCell = `
+    <div class="info-item info-cell-br">
       <span class="info-label">Email</span>
       <span class="info-value email-value">${escapeHtml(emp.email)}</span>
+    </div>`;
+
+  // Info group 2: ngày công chuẩn (left) + ngày công thực tế (right).
+  const ngayCongChuanCell = `
+    <div class="info-item">
+      ${emp.ngayCongChuan != null ? `<span class="info-label">Ngày công chuẩn</span>
+      <span class="info-value">${emp.ngayCongChuan} ngày</span>` : ''}
+    </div>`;
+
+  const ngayCongCell = `
+    <div class="info-item">
+      ${emp.ngayCong != null ? `<span class="info-label">Ngày công thực tế</span>
+      <span class="info-value">${emp.ngayCong} ngày</span>` : ''}
     </div>`;
 
   const bangchuStr = soThanhChu(emp.thucNhan);
@@ -409,11 +448,14 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     --line-strong: #111827;
     --accent: #b91c1c;
     --negative: #991b1b;
+    --paper-tint: #fafaf7;
     --sans: ${sansFonts};
     --mono: ${monoFonts};
   }
 
-  @page { size: A5; margin: 10mm; }
+  /* Long single page — @page width = A5 width, height auto.
+     printToPDF set pageSize động theo content height đo runtime. */
+  @page { size: 148mm auto; margin: 0; }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -424,6 +466,8 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     font-size: 12px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    width: 148mm;
+    padding: 12mm;
   }
 
   /* ── Masthead ── */
@@ -455,39 +499,57 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
   }
   .title-block { display: flex; justify-content: space-between; align-items: baseline; }
   .title { font-weight: 700; font-size: 20px; letter-spacing: -0.02em; line-height: 1.2; }
+  .period-block { text-align: right; }
   .period { font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 500; }
+  .issue-date { font-size: 9px; color: var(--muted); font-style: italic; margin-top: 2px; }
 
-  /* ── Employee info ── */
+  /* ── Employee info — 2 nhóm tách nhau ── */
   .info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px 20px;
-    padding: 12px 0 14px;
-    border-bottom: 1px solid var(--line);
-    margin-bottom: 16px;
+    gap: 12px 24px;
     break-inside: avoid;
   }
-  .info-item { display: flex; flex-direction: column; gap: 2px; }
+  /* Group 1: 4 ô fixed positions — kể cả khi 1 ô trống, các ô khác giữ vị trí */
+  .info-grid-main {
+    grid-template-rows: auto auto;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .info-cell-tl { grid-row: 1; grid-column: 1; }
+  .info-cell-tr { grid-row: 1; grid-column: 2; }
+  .info-cell-bl { grid-row: 2; grid-column: 1; }
+  .info-cell-br { grid-row: 2; grid-column: 2; }
+  /* Group 2: ngày công chuẩn (trái) + ngày công thực tế (phải) */
+  .info-grid-attendance {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 16px;
+  }
+  .info-item { display: flex; flex-direction: column; gap: 2px; min-height: 32px; }
   .info-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  /* Tất cả info-value đều đen + bold cho consistency */
   .info-value { font-size: 12px; font-weight: 600; color: var(--ink); }
-  .info-value.code { font-family: var(--mono); font-weight: 400; font-size: 11px; }
-  .info-value.email-value { font-size: 11px; font-weight: 400; word-break: break-all; }
+  .info-value.code { font-family: var(--mono); font-weight: 600; font-size: 11px; }
+  .info-value.email-value { font-size: 11px; font-weight: 600; word-break: break-all; }
+  .info-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
 
   /* ── Section ── */
-  .section { margin-bottom: 16px; break-inside: avoid; }
+  .section { margin-bottom: 44px; break-inside: avoid; }
   .section-head {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding-bottom: 4px;
+    background: var(--paper-tint);
+    padding: 7px 12px;
     border-bottom: 1px solid var(--ink);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
   }
-  .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; }
-  .section-hint { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .section-hint { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 
   /* ── Rows ── */
-  .row { display: flex; justify-content: space-between; align-items: flex-start; padding: 3px 0; gap: 12px; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; padding: 3px 0 3px 14px; gap: 12px; }
   .row-label { font-size: 12px; color: var(--ink-soft); }
   .note { font-size: 9px; color: var(--muted); line-height: 1.3; margin-top: 1px; font-weight: 400; font-style: italic; }
   .row-amount {
@@ -501,43 +563,187 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
   .row-amount.neg { color: var(--negative); }
   .row-amount.muted { color: var(--muted); }
 
-  .net-after-tax {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 9px 10px;
-    background: #f3f4f6;
-    border-radius: 3px;
-    margin-bottom: 16px;
+  /* Tổng thu nhập sau thuế — dùng section-head shape, override amount style */
+  .net-after-tax { margin-bottom: 28px; }
+  .net-after-tax-amount {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-transform: none;
+    letter-spacing: 0;
   }
-  .net-after-tax-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; }
-  .net-after-tax-amount { font-family: var(--mono); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-  .subtotal {
+  /* Subtotal ITALIC — Tổng lương (subtle).
+     Chỉ có gạch trên (shrink-wrap, dashed, mờ, mảnh ≈ 1/2 so với header). */
+  .subtotal-italic {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 7px 10px 6px;
-    background: #f9fafb;
-    border-top: 1px dashed var(--line);
-    margin-top: 4px;
-    border-radius: 0 0 3px 3px;
+    justify-content: flex-end;
+    margin-top: 8px;
+    margin-bottom: 6px;
   }
-  .subtotal .label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; }
-  .subtotal .amount { font-family: var(--mono); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .subtotal-italic-inner {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 12px;
+    border-top: 0.5px dashed var(--muted);
+    padding-top: 4px;
+  }
+  .subtotal-italic-inner .label {
+    font-size: 11px;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ink-soft);
+  }
+  .subtotal-italic-inner .amount {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-style: italic;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+  }
 
-  /* ── Total ── */
+  /* Supplementary row — italic subtle, dùng trong bảng Khấu trừ làm "show math" rows.
+     Không borders, đứng trong flow ngay trước subtotal-bordered. */
+  .supplementary {
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 12px;
+    padding: 1px 0;
+  }
+  .supplementary .label {
+    font-size: 11px;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ink-soft);
+  }
+  .supplementary .amount {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-style: italic;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+  }
+  .supplementary.first { margin-top: 8px; }
+  .supplementary.last  { margin-bottom: 4px; }
+
+  /* Variant: subtotal-bordered cho Tổng lương theo ngày công.
+     Top + bottom shrink-wrap, dùng style giống divider info-grid → 1px solid var(--line). */
+  .subtotal-bordered.subtotal-bordered-step {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .subtotal-bordered.subtotal-bordered-step .subtotal-bordered-inner {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 4px 0;
+  }
+
+  /* Subtotal BORDERED — đóng bảng. Top line full-width (giống section-head bottom),
+     bottom underline chỉ "đúng khung" của tổng phụ (không full width). */
+  .subtotal-bordered {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ink);
+  }
+  .subtotal-bordered-inner {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .subtotal-bordered-inner .label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+  }
+  .subtotal-bordered-inner .amount {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  /* Step ② — Tổng lương theo ngày công.
+     Không bg, không bold. Formula note gần baseline, cách dòng tiếp theo ra. */
+  .subtotal-step {
+    margin-top: 6px;
+    margin-bottom: 18px;
+  }
+  .subtotal-step-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .subtotal-step-row .label {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--ink);
+  }
+  .subtotal-step-row .amount {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .formula-note {
+    margin-top: 1px;
+    text-align: right;
+    font-size: 9px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .formula-note .calc {
+    display: block;
+    font-family: var(--mono);
+    font-style: normal;
+  }
+  .formula-note .desc {
+    display: block;
+    font-style: italic;
+  }
+
+  /* ── Total — đen-trắng, chữ cam tươi sáng, số extra-bold, bằng chữ to hơn ── */
   .total-block {
-    margin-top: 20px;
-    padding: 14px 0;
+    margin-top: 24px;
+    padding: 16px 0;
     border-top: 2px solid var(--line-strong);
     border-bottom: 2px solid var(--line-strong);
     break-inside: avoid;
   }
-  .total-row { display: flex; justify-content: space-between; align-items: baseline; }
-  .total-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
-  .total-amount { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-  .bangchu { margin-top: 6px; font-size: 9px; color: var(--muted); font-style: italic; }
+  .total-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+  .total-label {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .total-amount {
+    font-size: 32px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .bangchu {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    text-align: right;
+  }
 
   /* ── Footer ── */
   .disclaimer {
@@ -555,8 +761,8 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 24px -10mm 18px;
-    padding: 0 10mm;
+    margin: 24px -12mm 18px;
+    padding: 0 12mm;
     break-inside: avoid;
   }
   .section-divider::before, .section-divider::after {
@@ -580,8 +786,8 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     background: #fafaf7;
     border-top: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
-    margin: 0 -10mm;
-    padding: 14px 10mm 4px;
+    margin: 0 -12mm;
+    padding: 14px 12mm 4px;
   }
   .breakdown-head {
     display: flex;
@@ -700,24 +906,22 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     </div>
     <div class="title-block">
       <div class="title">Phiếu lương</div>
-      <div class="period">Kỳ ${month} / ${escapeHtml(opts.year)}</div>
+      <div class="period-block">
+        <div class="period">Kỳ ${month} / ${escapeHtml(opts.year)}</div>
+        <div class="issue-date">Ngày phát hành: ${formatDateVN(new Date())}</div>
+      </div>
     </div>
   </div>
 
-  <div class="info-grid">
-    <div class="info-item">
-      <span class="info-label">Họ và tên</span>
-      <span class="info-value">${escapeHtml(emp.hoTen)}</span>
-    </div>
-    <div class="info-item">
-      <span class="info-label">Mã nhân viên</span>
-      <span class="info-value code">${escapeHtml(emp.maNV)}</span>
-    </div>
-    ${viTriHtml}
-    ${ngayCongHtml}
-    ${emailHtml}
-    ${ngayCongChuanHtml}
-    ${phongBanHtml}
+  <div class="info-grid info-grid-main">
+    ${hoTenCell}
+    ${maNVCell}
+    ${viTriCell}
+    ${emailCell}
+  </div>
+  <div class="info-grid info-grid-attendance">
+    ${ngayCongChuanCell}
+    ${ngayCongCell}
   </div>
 
   <section class="section">
@@ -725,10 +929,23 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
       <span class="section-title">Thu nhập</span>
       <span class="section-hint">(+)</span>
     </div>
-    ${thuNhapRows || '<div class="row"><div class="row-label" style="color:var(--muted)">— Không có —</div></div>'}
-    <div class="subtotal">
-      <span class="label">Tổng thu nhập</span>
-      <span class="amount">${formatCurrency(tongThuNhap)}</span>
+    ${hasLuongStep ? `
+      ${luongRows}
+      <div class="subtotal-italic">
+        <div class="subtotal-italic-inner">
+          <span class="label">Tổng lương:</span>
+          <span class="amount">${formatCurrency(tongLuong)}</span>
+        </div>
+      </div>
+      ${tongLuongNgayCongBlock}
+    ` : ''}
+    ${hasBoSungStep ? thuNhapBoSungRows : ''}
+    ${(!hasLuongStep && !hasBoSungStep) ? '<div class="row"><div class="row-label" style="color:var(--muted)">— Không có —</div></div>' : ''}
+    <div class="subtotal-bordered">
+      <div class="subtotal-bordered-inner">
+        <span class="label">Tổng thu nhập:</span>
+        <span class="amount">${formatCurrency(tongThuNhap)}</span>
+      </div>
     </div>
   </section>
 
@@ -741,11 +958,35 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     ${khauTruPreTax}
     ${giamTruNPTHtml}
     ${khauTruTax}
-    <div class="subtotal">
-      <span class="label">Tổng khấu trừ</span>
-      <span class="amount" style="color:var(--negative)">−${formatCurrency(tongKhauTru)}</span>
+    <div class="subtotal-bordered">
+      <div class="subtotal-bordered-inner">
+        <span class="label">Tổng khấu trừ:</span>
+        <span class="amount" style="color:var(--negative)">−${formatCurrency(tongKhauTru)}</span>
+      </div>
     </div>
   </section>
+
+  ${emp.tongThuNhapSauThue != null ? `
+  <section class="section">
+    <div class="section-head">
+      <span class="section-title">Thu nhập sau thuế</span>
+      <span class="section-hint">(=)</span>
+    </div>
+    <div class="row">
+      <div class="row-label">Tổng thu nhập</div>
+      <div class="row-amount">+${formatCurrency(tongThuNhap)}</div>
+    </div>
+    <div class="row">
+      <div class="row-label">Tổng các khoản khấu trừ</div>
+      <div class="row-amount neg">−${formatCurrency(tongKhauTru)}</div>
+    </div>
+    <div class="subtotal-bordered">
+      <div class="subtotal-bordered-inner">
+        <span class="label">Tổng thu nhập sau thuế:</span>
+        <span class="amount">${formatCurrency(emp.tongThuNhapSauThue)}</span>
+      </div>
+    </div>
+  </section>` : ''}
 
   ${tongThuNhapSauThueHtml}
 
@@ -773,14 +1014,25 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
 async function htmlToPdf(html: string): Promise<Buffer> {
   const win = new BrowserWindow({
     show: false,
+    width: 600,
+    height: 800,
     webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true },
   });
   try {
     const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
     await win.loadURL(dataUrl);
+
+    // Đo content height (CSS px @96 DPI) → convert sang inches cho printToPDF.
+    // Electron 21+ pageSize dùng INCHES, không phải microns.
+    const heightPx = (await win.webContents.executeJavaScript(
+      `Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight)`
+    )) as number;
+    const heightInches = Math.max(heightPx / 96, 5.83); // tối thiểu = A5 height ratio
+    const widthInches = 148 / 25.4; // 148mm → 5.8268 in
+
     const pdf = await win.webContents.printToPDF({
       printBackground: true,
-      pageSize: 'A5',
+      pageSize: { width: widthInches, height: heightInches },
       margins: { marginType: 'none' },
     });
     return pdf;
