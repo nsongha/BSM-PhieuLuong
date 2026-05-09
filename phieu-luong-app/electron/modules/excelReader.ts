@@ -84,6 +84,39 @@ function detectHeaders(allRows: unknown[][]): { mergedHeaders: string[]; dataSta
   return { mergedHeaders, dataStartIdx: dataStart };
 }
 
+function colIndexToLetter(idx: number): string {
+  let s = '';
+  let n = idx;
+  while (n >= 0) {
+    s = String.fromCharCode((n % 26) + 65) + s;
+    n = Math.floor(n / 26) - 1;
+  }
+  return s;
+}
+
+/**
+ * Lan toả giá trị anchor của các cell merged xuống các cell con — chỉ áp dụng
+ * ở vùng header (15 dòng đầu) để tránh ảnh hưởng data thật.
+ *
+ * SheetJS để cell con của merge = '' theo mặc định; nhiều file BSM-style merge
+ * theo chiều dọc (e.g. AM4:AM6 = "TỔNG THU NHẬP") khiến header phụ bị mất tên.
+ */
+function fillMergedHeaderCells(ws: XLSX.WorkSheet, allRows: unknown[][], headerScan = 15): void {
+  const merges = ws['!merges'];
+  if (!merges) return;
+  for (const m of merges) {
+    if (m.s.r >= headerScan) continue; // chỉ vùng header
+    const anchor = (allRows[m.s.r] ?? [])[m.s.c];
+    if (anchor === '' || anchor == null) continue;
+    for (let r = m.s.r; r <= m.e.r && r < headerScan; r++) {
+      if (!allRows[r]) allRows[r] = [];
+      for (let c = m.s.c; c <= m.e.c; c++) {
+        if (!allRows[r][c]) allRows[r][c] = anchor;
+      }
+    }
+  }
+}
+
 export function readXlsx(
   filePath: string,
   sheetIndex = 0
@@ -94,9 +127,21 @@ export function readXlsx(
   const ws = wb.Sheets[sheetName];
 
   const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
+  fillMergedHeaderCells(ws, allRows);
   const { mergedHeaders, dataStartIdx } = detectHeaders(allRows);
 
-  const headers = mergedHeaders.map((h, i) => (h && h.trim() ? h : `Cột ${i + 1}`));
+  // Dedupe headers — nhiều file có header trùng tên ở các cột khác nhau (vd "Hỗ trợ ăn trưa"
+  // xuất hiện cả ở phần Thử việc lẫn Chính thức). Append cột letter cho duplicate để
+  // giữ data riêng biệt (downstream dùng row[header] để lookup).
+  const seenHeaders = new Map<string, number>();
+  const headers = mergedHeaders.map((h, i) => {
+    const name = h && h.trim() ? h : `Cột ${i + 1}`;
+    const count = seenHeaders.get(name) ?? 0;
+    seenHeaders.set(name, count + 1);
+    if (count === 0) return name;
+    const colLetter = colIndexToLetter(i);
+    return `${name} (${colLetter})`;
+  });
   const dataRows = allRows.slice(dataStartIdx);
 
   if (dataRows.length > MAX_ROWS) {
