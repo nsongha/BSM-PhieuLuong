@@ -25,18 +25,33 @@ export type Phuluc = {
   quyenLoi?: PhulucQuyenLoi;
 };
 
+export type LoaiNV = 'chinhThuc' | 'thuViec' | 'ctv' | 'unknown';
+
+export type LuongPath = {
+  tongCol: string;
+  items: Array<{ nhan: string; col: string; note?: string }>;
+};
+
 export type Employee = {
   rowIndex: number;
   hoTen: string;
   email: string;
   maNV: string;
   pdfPassword: string;
+  loaiNV: LoaiNV;
   viTri?: string;
   phongBan?: string;
   ngayCong?: number;
   ngayCongChuan?: number;
   thucNhan: number;
-  thuNhap: Array<{ nhan: string; soTien: number; note?: string }>;
+  // Bước ① — items + Tổng lương (đọc từ Excel)
+  luong: Array<{ nhan: string; soTien: number; note?: string }>;
+  tongLuong?: number;
+  // Bước ② — Tổng lương theo ngày công (đọc từ Excel)
+  tongLuongNgayCong?: number;
+  // Bước ③ — items + Tổng thu nhập (đọc từ Excel)
+  thuNhapBoSung: Array<{ nhan: string; soTien: number; note?: string }>;
+  tongThuNhap?: number;
   khauTru: Array<{ nhan: string; soTien: number; note?: string }>;
   giamTruNPT?: number;
   tongThuNhapSauThue?: number;
@@ -49,12 +64,20 @@ export type Mapping = {
   hoTen: string;
   email: string;
   maNV: string;
+  code?: string;
   thucNhan: string;
   viTri?: string;
   phongBan?: string;
   ngayCong?: string;
   ngayCongChuan?: string;
-  thuNhap: Array<{ nhan: string; col: string; note?: string }>;
+  // Bước ① — paths theo loại NV (chính thức exposed in UI; thử việc/CTV auto)
+  luongChinhThuc?: LuongPath;
+  luongThuViec?: LuongPath;
+  luongCtv?: LuongPath;
+  // Bước ② + ③ — cột tổng đã tính sẵn trong Excel
+  tongLuongNgayCongCol?: string;
+  tongThuNhapCol?: string;
+  thuNhapBoSung: Array<{ nhan: string; col: string; note?: string }>;
   khauTru: Array<{ nhan: string; col: string; note?: string }>;
   giamTruNPT?: string;
   tongThuNhapSauThue?: string;

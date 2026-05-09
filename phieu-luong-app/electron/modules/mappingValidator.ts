@@ -1,6 +1,5 @@
-import type { Employee, Mapping } from '../preload';
+import type { Employee, LoaiNV, LuongPath, Mapping } from '../preload';
 
-// TLD phải ≥ 2 ký tự chữ cái (reject "a@b.c", "x@y.1") và phần local/domain không rỗng/có space.
 const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-zA-Z]{2,}$/;
 
 function toNumber(v: unknown): number {
@@ -26,17 +25,66 @@ function fmtVN(n: number): string {
   return n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
 }
 
+// Loại NV detection — chuẩn hoá rồi match keyword (không hardcode value cố định)
+const LOAI_NV_KEYWORDS: Record<Exclude<LoaiNV, 'unknown'>, string[]> = {
+  chinhThuc: ['on', 'active', 'chinh thuc', 'official', 'ct'],
+  thuViec: ['intern', 'thu viec', 'tv', 'probation', 'tap su'],
+  ctv: ['ctv', 'cong tac vien', 'freelance', 'partner'],
+};
+
+function normalizeCode(v: unknown): string {
+  return String(v ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim();
+}
+
+export function detectLoaiNV(code: unknown): LoaiNV {
+  const s = normalizeCode(code);
+  if (!s) return 'unknown';
+  for (const [type, kws] of Object.entries(LOAI_NV_KEYWORDS) as Array<[Exclude<LoaiNV, 'unknown'>, string[]]>) {
+    if (kws.some((kw) => s === kw || s === kw.replace(/\s+/g, ''))) return type;
+  }
+  // Fuzzy contains as fallback for typos like "ON-1" etc.
+  for (const [type, kws] of Object.entries(LOAI_NV_KEYWORDS) as Array<[Exclude<LoaiNV, 'unknown'>, string[]]>) {
+    if (kws.some((kw) => s.includes(kw))) return type;
+  }
+  return 'unknown';
+}
+
+function classifyRow(row: Record<string, unknown>, mapping: Mapping): LoaiNV {
+  // Primary: cột Code
+  if (mapping.code) {
+    const detected = detectLoaiNV(row[mapping.code]);
+    if (detected !== 'unknown') return detected;
+  }
+  // Fallback: cột Tổng lương CTV/Thử việc có giá trị > 0 → loại NV tương ứng
+  const ctvVal = mapping.luongCtv?.tongCol ? toNumber(row[mapping.luongCtv.tongCol]) : NaN;
+  if (Number.isFinite(ctvVal) && ctvVal > 0) return 'ctv';
+  const tvVal = mapping.luongThuViec?.tongCol ? toNumber(row[mapping.luongThuViec.tongCol]) : NaN;
+  if (Number.isFinite(tvVal) && tvVal > 0) return 'thuViec';
+  // Default: chính thức (cũng là dạng phổ biến nhất)
+  return 'chinhThuc';
+}
+
+function pickLuongPath(loaiNV: LoaiNV, mapping: Mapping): LuongPath | undefined {
+  if (loaiNV === 'chinhThuc') return mapping.luongChinhThuc;
+  if (loaiNV === 'thuViec') return mapping.luongThuViec;
+  if (loaiNV === 'ctv') return mapping.luongCtv;
+  return mapping.luongChinhThuc; // unknown → fallback chính thức
+}
+
 /**
- * Auto-compute note cho 2 dòng canon trong phiếu lương:
+ * Auto-compute note cho 2 dòng canon:
  *   - "Lương cơ bản" → note: "Mức đóng BHXH: {giá trị} ₫"
  *   - "BHXH nhân viên đóng" → note: "{tỷ lệ}% × {lương cơ bản} ₫"
- * Chỉ gán nếu user/mapping chưa có note sẵn.
  */
 function attachAutoNotes(
-  thuNhap: Array<{ nhan: string; soTien: number; note?: string }>,
+  luong: Array<{ nhan: string; soTien: number; note?: string }>,
   khauTru: Array<{ nhan: string; soTien: number; note?: string }>
 ) {
-  const luongCoBan = thuNhap.find((i) => /lương\s*cơ\s*bản/i.test(i.nhan));
+  const luongCoBan = luong.find((i) => /lương\s*cơ\s*bản/i.test(i.nhan));
   if (luongCoBan && !luongCoBan.note && luongCoBan.soTien > 0) {
     luongCoBan.note = `Mức đóng BHXH: ${fmtVN(luongCoBan.soTien)}`;
   }
@@ -72,15 +120,31 @@ export function validateAndMap(
     if (mapping.maNV && !maNV) errors.push('Thiếu Mã NV');
     if (!Number.isFinite(thucNhan)) errors.push('Thực nhận không phải số hợp lệ');
 
-    const thuNhap = mapping.thuNhap
+    const loaiNV = classifyRow(row, mapping);
+    const luongPath = pickLuongPath(loaiNV, mapping);
+
+    // Bước ① — items + Tổng lương (đọc từ Excel theo loại NV)
+    const luong = (luongPath?.items ?? [])
       .map((item) => ({ nhan: item.nhan, soTien: toNumber(row[item.col]), note: item.note }))
       .filter((item) => Number.isFinite(item.soTien) && item.soTien !== 0);
+    const tongLuongRaw = luongPath?.tongCol ? toNumber(row[luongPath.tongCol]) : NaN;
+
+    // Bước ② — Tổng lương theo ngày công (đọc từ Excel)
+    const tongLuongNgayCongRaw = mapping.tongLuongNgayCongCol
+      ? toNumber(row[mapping.tongLuongNgayCongCol])
+      : NaN;
+
+    // Bước ③ — items bổ sung + Tổng thu nhập (đọc từ Excel)
+    const thuNhapBoSung = mapping.thuNhapBoSung
+      .map((item) => ({ nhan: item.nhan, soTien: toNumber(row[item.col]), note: item.note }))
+      .filter((item) => Number.isFinite(item.soTien) && item.soTien !== 0);
+    const tongThuNhapRaw = mapping.tongThuNhapCol ? toNumber(row[mapping.tongThuNhapCol]) : NaN;
 
     const khauTru = mapping.khauTru
       .map((item) => ({ nhan: item.nhan, soTien: toNumber(row[item.col]), note: item.note }))
       .filter((item) => Number.isFinite(item.soTien) && item.soTien !== 0);
 
-    attachAutoNotes(thuNhap, khauTru);
+    attachAutoNotes(luong, khauTru);
 
     const ngoaiLuong = (mapping.ngoaiLuong ?? [])
       .map((item) => {
@@ -101,12 +165,17 @@ export function validateAndMap(
       email,
       maNV,
       pdfPassword: generateOtp(),
+      loaiNV,
       viTri: mapping.viTri ? toString(row[mapping.viTri]) || undefined : undefined,
       phongBan: mapping.phongBan ? toString(row[mapping.phongBan]) || undefined : undefined,
       ngayCong: Number.isFinite(ngayCongRaw) ? ngayCongRaw : undefined,
       ngayCongChuan: Number.isFinite(ngayCongChuanRaw) ? ngayCongChuanRaw : undefined,
       thucNhan: Number.isFinite(thucNhan) ? thucNhan : 0,
-      thuNhap,
+      luong,
+      tongLuong: Number.isFinite(tongLuongRaw) ? tongLuongRaw : undefined,
+      tongLuongNgayCong: Number.isFinite(tongLuongNgayCongRaw) ? tongLuongNgayCongRaw : undefined,
+      thuNhapBoSung,
+      tongThuNhap: Number.isFinite(tongThuNhapRaw) ? tongThuNhapRaw : undefined,
       khauTru,
       giamTruNPT: Number.isFinite(giamTruNPTRaw) ? giamTruNPTRaw : undefined,
       tongThuNhapSauThue: Number.isFinite(tongThuNhapSauThueRaw) ? tongThuNhapSauThueRaw : undefined,

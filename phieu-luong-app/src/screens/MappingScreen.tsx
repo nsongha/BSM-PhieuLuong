@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Plus, X, AlertCircle } from 'lucide-react';
-import type { Employee, Mapping } from '../lib/api';
+import type { Employee, LuongPath, Mapping } from '../lib/api';
 import { api } from '../lib/api';
 
 type Props = {
@@ -11,24 +11,51 @@ type Props = {
   onComplete: (mapping: Mapping, employees: Employee[]) => void;
 };
 
+type SimpleListKind = 'thuNhapBoSung' | 'khauTru';
+
 export function MappingScreen({ headers, rows, initialMapping, onBack, onComplete }: Props) {
   const [mapping, setMapping] = useState<Mapping>(initialMapping);
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const setReq = (k: keyof Mapping, v: string) => setMapping((m) => ({ ...m, [k]: v }));
+  const setField = (k: keyof Mapping, v: string) =>
+    setMapping((m) => ({ ...m, [k]: v || undefined }));
 
-  const addItem = (kind: 'thuNhap' | 'khauTru') =>
+  const setLuongChinhThuc = (next: LuongPath | undefined) =>
+    setMapping((m) => ({ ...m, luongChinhThuc: next }));
+
+  const addLuongItem = () =>
+    setLuongChinhThuc({
+      tongCol: mapping.luongChinhThuc?.tongCol ?? '',
+      items: [...(mapping.luongChinhThuc?.items ?? []), { nhan: '', col: headers[0] ?? '' }],
+    });
+  const setLuongItem = (i: number, u: Partial<{ nhan: string; col: string }>) =>
+    setLuongChinhThuc({
+      tongCol: mapping.luongChinhThuc?.tongCol ?? '',
+      items: (mapping.luongChinhThuc?.items ?? []).map((x, idx) => (idx === i ? { ...x, ...u } : x)),
+    });
+  const delLuongItem = (i: number) =>
+    setLuongChinhThuc({
+      tongCol: mapping.luongChinhThuc?.tongCol ?? '',
+      items: (mapping.luongChinhThuc?.items ?? []).filter((_, idx) => idx !== i),
+    });
+  const setLuongTongCol = (v: string) =>
+    setLuongChinhThuc({
+      tongCol: v,
+      items: mapping.luongChinhThuc?.items ?? [],
+    });
+
+  const addItem = (kind: SimpleListKind) =>
     setMapping((m) => ({
       ...m,
       [kind]: [...m[kind], { nhan: '', col: headers[0] ?? '' }],
     }));
-  const setItem = (kind: 'thuNhap' | 'khauTru', i: number, u: Partial<{ nhan: string; col: string }>) =>
+  const setItem = (kind: SimpleListKind, i: number, u: Partial<{ nhan: string; col: string }>) =>
     setMapping((m) => ({
       ...m,
       [kind]: m[kind].map((x, idx) => (idx === i ? { ...x, ...u } : x)),
     }));
-  const delItem = (kind: 'thuNhap' | 'khauTru', i: number) =>
+  const delItem = (kind: SimpleListKind, i: number) =>
     setMapping((m) => ({ ...m, [kind]: m[kind].filter((_, idx) => idx !== i) }));
 
   const canValidate = mapping.hoTen && mapping.email && mapping.thucNhan;
@@ -45,6 +72,8 @@ export function MappingScreen({ headers, rows, initialMapping, onBack, onComplet
       setValidating(false);
     }
   };
+
+  const luongItems = mapping.luongChinhThuc?.items ?? [];
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -63,22 +92,148 @@ export function MappingScreen({ headers, rows, initialMapping, onBack, onComplet
       <section className="card p-6 space-y-5">
         <h2 className="text-xl font-semibold text-slate-900">Trường bắt buộc</h2>
         <div className="space-y-3">
-          <Req label="Họ và tên" keyId="hoTen" mapping={mapping} headers={headers} onChange={setReq} />
-          <Req label="Email" keyId="email" mapping={mapping} headers={headers} onChange={setReq} />
-          <Req label="Mã nhân viên" keyId="maNV" mapping={mapping} headers={headers} onChange={setReq} />
-          <Req label="Thực nhận" keyId="thucNhan" mapping={mapping} headers={headers} onChange={setReq} />
+          <FieldRow label="Họ và tên" keyId="hoTen" mapping={mapping} headers={headers} onChange={setField} />
+          <FieldRow label="Email" keyId="email" mapping={mapping} headers={headers} onChange={setField} />
+          <FieldRow label="Mã nhân viên" keyId="maNV" mapping={mapping} headers={headers} onChange={setField} />
+          {!mapping.maNV && (
+            <div className="ml-[180px] flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <span>Mã NV chưa được map — phiếu lương sẽ không hiển thị Mã NV. Số phiếu sẽ dùng STT thay thế.</span>
+            </div>
+          )}
+          <FieldRow label="Thực nhận" keyId="thucNhan" mapping={mapping} headers={headers} onChange={setField} />
         </div>
       </section>
 
-      <CategorySection
-        title="Các khoản thu nhập"
-        items={mapping.thuNhap}
-        headers={headers}
-        onAdd={() => addItem('thuNhap')}
-        onChange={(i, u) => setItem('thuNhap', i, u)}
-        onDelete={(i) => delItem('thuNhap', i)}
-        placeholder="Ví dụ: Lương cơ bản"
-      />
+      <section className="card p-6 space-y-5">
+        <h2 className="text-xl font-semibold text-slate-900">Trường tuỳ chọn</h2>
+        <p className="text-sm text-slate-500">
+          Cột <strong>Code</strong> dùng để phân loại NV (ON / Intern / CTV). Nếu để trống, app tự đoán theo cột "Tổng lương" có giá trị.
+        </p>
+        <div className="space-y-3">
+          <FieldRow label="Cột Code (loại NV)" keyId="code" mapping={mapping} headers={headers} onChange={setField} />
+          <FieldRow label="Chức danh" keyId="viTri" mapping={mapping} headers={headers} onChange={setField} />
+          <FieldRow label="Phòng ban" keyId="phongBan" mapping={mapping} headers={headers} onChange={setField} />
+          <FieldRow label="Ngày công thực tế" keyId="ngayCong" mapping={mapping} headers={headers} onChange={setField} />
+          <FieldRow label="Ngày công chuẩn" keyId="ngayCongChuan" mapping={mapping} headers={headers} onChange={setField} />
+        </div>
+      </section>
+
+      <section className="card p-6 space-y-5">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Tổng lương — bước ① &amp; ②</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            App đọc thẳng các tổng đã tính sẵn trong Excel, không tính lại.
+          </p>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-[180px_1fr] items-center gap-4">
+            <label className="text-base font-medium text-slate-700">Tổng lương (chính thức)</label>
+            <select
+              value={mapping.luongChinhThuc?.tongCol ?? ''}
+              onChange={(e) => setLuongTongCol(e.target.value)}
+              className="input"
+            >
+              <option value="">— Chọn cột —</option>
+              {headers.map((h) => (
+                <option key={h} value={h}>{h}</option>
+              ))}
+            </select>
+          </div>
+          <FieldRow
+            label="Tổng lương theo ngày công"
+            keyId="tongLuongNgayCongCol"
+            mapping={mapping}
+            headers={headers}
+            onChange={setField}
+          />
+        </div>
+
+        <div className="pt-3 border-t border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-800">
+              Các khoản trong Tổng lương <span className="text-sm text-slate-500 font-normal">(chính thức)</span>
+            </h3>
+            <button onClick={addLuongItem} className="btn-ghost text-brand-600 hover:bg-brand-50">
+              <Plus size={18} /> Thêm khoản
+            </button>
+          </div>
+          {luongItems.length === 0 && (
+            <p className="text-sm text-slate-500">Chưa có khoản nào.</p>
+          )}
+          <div className="space-y-3">
+            {luongItems.map((item, i) => (
+              <ItemRow
+                key={i}
+                item={item}
+                headers={headers}
+                placeholder="Ví dụ: Lương cơ bản"
+                onChange={(u) => setLuongItem(i, u)}
+                onDelete={() => delLuongItem(i)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {(mapping.luongThuViec || mapping.luongCtv) && (
+          <div className="pt-3 border-t border-slate-200 space-y-2">
+            <h3 className="text-base font-semibold text-slate-800">Auto-detect cho loại NV khác</h3>
+            {mapping.luongThuViec && (
+              <p className="text-sm text-slate-600">
+                <strong>Thử việc:</strong> tổng = <code>{mapping.luongThuViec.tongCol}</code>
+                {mapping.luongThuViec.items.length > 0 && (
+                  <> · {mapping.luongThuViec.items.length} khoản breakdown</>
+                )}
+              </p>
+            )}
+            {mapping.luongCtv && (
+              <p className="text-sm text-slate-600">
+                <strong>CTV / thực tập:</strong> tổng = <code>{mapping.luongCtv.tongCol}</code>
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="card p-6 space-y-5">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Tổng thu nhập — bước ③</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Tổng thu nhập = Tổng lương theo ngày công + các khoản bổ sung (OT, KPI, Bonus…).
+          </p>
+        </div>
+        <FieldRow
+          label="Cột Tổng thu nhập"
+          keyId="tongThuNhapCol"
+          mapping={mapping}
+          headers={headers}
+          onChange={setField}
+        />
+
+        <div className="pt-3 border-t border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-800">Các khoản thu nhập bổ sung</h3>
+            <button onClick={() => addItem('thuNhapBoSung')} className="btn-ghost text-brand-600 hover:bg-brand-50">
+              <Plus size={18} /> Thêm khoản
+            </button>
+          </div>
+          {mapping.thuNhapBoSung.length === 0 && (
+            <p className="text-sm text-slate-500">Chưa có khoản nào.</p>
+          )}
+          <div className="space-y-3">
+            {mapping.thuNhapBoSung.map((item, i) => (
+              <ItemRow
+                key={i}
+                item={item}
+                headers={headers}
+                placeholder="Ví dụ: KPI Chuyên cần"
+                onChange={(u) => setItem('thuNhapBoSung', i, u)}
+                onDelete={() => delItem('thuNhapBoSung', i)}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
 
       <CategorySection
         title="Các khoản khấu trừ"
@@ -111,7 +266,7 @@ export function MappingScreen({ headers, rows, initialMapping, onBack, onComplet
   );
 }
 
-function Req({
+function FieldRow({
   label,
   keyId,
   mapping,
@@ -124,21 +279,57 @@ function Req({
   headers: string[];
   onChange: (k: keyof Mapping, v: string) => void;
 }) {
+  const value = (mapping[keyId] as string | undefined) ?? '';
   return (
     <div className="grid grid-cols-[180px_1fr] items-center gap-4">
       <label className="text-base font-medium text-slate-700">{label}</label>
       <select
-        value={mapping[keyId] as string}
+        value={value}
         onChange={(e) => onChange(keyId, e.target.value)}
         className="input"
       >
         <option value="">— Chọn cột —</option>
         {headers.map((h) => (
-          <option key={h} value={h}>
-            {h}
-          </option>
+          <option key={h} value={h}>{h}</option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function ItemRow({
+  item,
+  headers,
+  placeholder,
+  onChange,
+  onDelete,
+}: {
+  item: { nhan: string; col: string };
+  headers: string[];
+  placeholder: string;
+  onChange: (u: Partial<{ nhan: string; col: string }>) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-3">
+      <input
+        placeholder={placeholder}
+        value={item.nhan}
+        onChange={(e) => onChange({ nhan: e.target.value })}
+        className="input"
+      />
+      <select value={item.col} onChange={(e) => onChange({ col: e.target.value })} className="input">
+        {headers.map((h) => (
+          <option key={h} value={h}>{h}</option>
+        ))}
+      </select>
+      <button
+        onClick={onDelete}
+        className="w-11 h-11 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+        aria-label="Xoá"
+      >
+        <X size={20} />
+      </button>
     </div>
   );
 }
@@ -174,32 +365,14 @@ function CategorySection({
       )}
       <div className="space-y-3">
         {items.map((item, i) => (
-          <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-3">
-            <input
-              placeholder={placeholder}
-              value={item.nhan}
-              onChange={(e) => onChange(i, { nhan: e.target.value })}
-              className="input"
-            />
-            <select
-              value={item.col}
-              onChange={(e) => onChange(i, { col: e.target.value })}
-              className="input"
-            >
-              {headers.map((h) => (
-                <option key={h} value={h}>
-                  {h}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => onDelete(i)}
-              className="w-11 h-11 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
-              aria-label="Xoá"
-            >
-              <X size={20} />
-            </button>
-          </div>
+          <ItemRow
+            key={i}
+            item={item}
+            headers={headers}
+            placeholder={placeholder}
+            onChange={(u) => onChange(i, u)}
+            onDelete={() => onDelete(i)}
+          />
         ))}
       </div>
     </section>

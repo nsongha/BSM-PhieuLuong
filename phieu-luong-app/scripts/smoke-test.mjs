@@ -47,23 +47,33 @@ const filteredRows = rows.filter((r) => {
 });
 console.log(`  Filtered rows: ${filteredRows.length}`);
 
+// Mapping shape mới (post-refactor): luongChinhThuc + thuNhapBoSung thay cho thuNhap.
+// Mỗi loại NV (chính thức / thử việc / CTV) có thể có path riêng — smoke test chỉ
+// dùng chính thức cho mockup đơn giản.
 const mapping = {
   hoTen: 'Họ và tên',
   email: 'Email',
   maNV: 'Mã NV',
-  cccd: 'CCCD',
   thucNhan: 'Thực nhận',
-  thuNhap: [
-    { nhan: 'Lương cơ bản', col: 'Lương cơ bản' },
-    { nhan: 'Phụ cấp ăn trưa', col: 'Phụ cấp ăn trưa' },
-    { nhan: 'Phụ cấp xăng xe', col: 'Phụ cấp xăng xe' },
-    { nhan: 'Thưởng tháng', col: 'Thưởng tháng' },
+  luongChinhThuc: {
+    tongCol: 'Lương cơ bản',
+    items: [
+      { nhan: 'Lương cơ bản', col: 'Lương cơ bản' },
+      { nhan: 'Phụ cấp ăn trưa', col: 'Phụ cấp ăn trưa' },
+      { nhan: 'Phụ cấp xăng xe', col: 'Phụ cấp xăng xe' },
+      { nhan: 'Thưởng tháng', col: 'Thưởng tháng' },
+    ],
+  },
+  thuNhapBoSung: [
+    { nhan: 'Lương làm thêm (OT)', col: 'Lương làm thêm (OT)' },
+    { nhan: 'Hỗ trợ nhà ở', col: 'Hỗ trợ nhà ở' },
   ],
   khauTru: [
     { nhan: 'BHXH', col: 'BHXH (8%)' },
     { nhan: 'BHYT', col: 'BHYT (1.5%)' },
     { nhan: 'Thuế TNCN', col: 'Thuế TNCN' },
   ],
+  ngoaiLuong: [],
 };
 const employees = validateAndMap(filteredRows, mapping);
 const valid = employees.filter((e) => e.errors.length === 0);

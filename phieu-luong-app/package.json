@@ -1,6 +1,6 @@
 {
   "name": "phieu-luong-app",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Phiếu lương gửi email hàng loạt — Mac Electron app",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -90,7 +90,9 @@
         {
           "from": "assets/qpdf-win",
           "to": "qpdf-win",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     },

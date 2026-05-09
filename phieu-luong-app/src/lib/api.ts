@@ -23,19 +23,34 @@ export type Phuluc = {
   quyenLoi?: PhulucQuyenLoi;
 };
 
+export type LoaiNV = 'chinhThuc' | 'thuViec' | 'ctv' | 'unknown';
+
+export type LuongPath = {
+  tongCol: string;
+  items: Array<{ nhan: string; col: string; note?: string }>;
+};
+
 export type Employee = {
   rowIndex: number;
   hoTen: string;
   email: string;
   maNV: string;
   pdfPassword: string;
+  loaiNV: LoaiNV;
   viTri?: string;
   phongBan?: string;
   ngayCong?: number;
   ngayCongChuan?: number;
   thucNhan: number;
-  thuNhap: Array<{ nhan: string; soTien: number; note?: string }>;
+  luong: Array<{ nhan: string; soTien: number; note?: string }>;
+  tongLuong?: number;
+  tongLuongNgayCong?: number;
+  thuNhapBoSung: Array<{ nhan: string; soTien: number; note?: string }>;
+  tongThuNhap?: number;
   khauTru: Array<{ nhan: string; soTien: number; note?: string }>;
+  giamTruNPT?: number;
+  tongThuNhapSauThue?: number;
+  ngoaiLuong: Array<{ nhan: string; soTien: number; note?: string }>;
   phuluc?: Phuluc;
   errors: string[];
 };
@@ -44,12 +59,18 @@ export type Mapping = {
   hoTen: string;
   email: string;
   maNV: string;
+  code?: string;
   thucNhan: string;
   viTri?: string;
   phongBan?: string;
   ngayCong?: string;
   ngayCongChuan?: string;
-  thuNhap: Array<{ nhan: string; col: string; note?: string }>;
+  luongChinhThuc?: LuongPath;
+  luongThuViec?: LuongPath;
+  luongCtv?: LuongPath;
+  tongLuongNgayCongCol?: string;
+  tongThuNhapCol?: string;
+  thuNhapBoSung: Array<{ nhan: string; col: string; note?: string }>;
   khauTru: Array<{ nhan: string; col: string; note?: string }>;
   giamTruNPT?: string;
   tongThuNhapSauThue?: string;
