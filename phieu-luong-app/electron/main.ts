@@ -65,6 +65,10 @@ function setupAutoUpdater() {
 
   // Kiểm tra sau 3 giây để window kịp render xong
   setTimeout(() => autoUpdater.checkForUpdates(), 3000);
+
+  // Check định kỳ mỗi 4 tiếng — user để app mở cả ngày vẫn nhận update
+  const FOUR_HOURS = 4 * 60 * 60 * 1000;
+  setInterval(() => autoUpdater.checkForUpdates(), FOUR_HOURS);
 }
 
 app.whenReady().then(() => {
