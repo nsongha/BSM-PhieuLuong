@@ -9,8 +9,8 @@ Desktop app (Electron) để gửi phiếu lương hàng loạt qua email — ch
 ## Tính năng chính
 
 - **Đọc Excel thông minh**: hỗ trợ file nhiều sheet, nhiều kỳ lương, header 2 cấp
-- **Auto-mapping cột**: tự nhận diện cột Họ tên / Email / Mã NV / Lương / BHXH / Thuế... theo keyword tiếng Việt và tiếng Anh
-- **Phiếu lương PDF đẹp**: layout A5, có logo công ty, đọc số thành chữ tiếng Việt, kèm phụ lục bảng công (tuỳ chọn)
+- **Auto-mapping cột**: tự nhận diện cột Họ tên / Email / Mã NV / Lương / BHXH / Thuế... theo keyword tiếng Việt và tiếng Anh; phân loại NV (chính thức / thử việc / CTV) qua cột Code
+- **Phiếu lương PDF đẹp**: layout 1 trang dài (148mm × auto height — đọc mobile mượt), trình bày 3 bước thu nhập rõ ràng (Tổng lương → Tổng lương theo ngày công với công thức → Tổng thu nhập), tách bảng "Thu nhập sau thuế" riêng, có logo công ty, đọc số thành chữ tiếng Việt, kèm phụ lục bảng công (tuỳ chọn)
 - **Bảo vệ PDF bằng mật khẩu**: qpdf mã hoá AES-256, mỗi người nhận có mật khẩu riêng
 - **Gửi hàng loạt qua Gmail SMTP**: retry tự động, delay giữa các email, tiến trình real-time
 - **Checkpoint & resume**: gửi dở bị ngắt → lần sau mở app có thể tiếp tục

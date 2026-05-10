@@ -111,10 +111,15 @@ File Excel cần có ít nhất các cột sau (tên cột linh hoạt — app t
 |---|---|
 | Họ và tên | "Họ và tên", "Họ tên", "Fullname" |
 | Email | "Email", "E-mail" |
-| Mã nhân viên | "Mã NV", "Mã Nhân viên", "Employee ID" |
+| Mã nhân viên | "Mã NV", "Mã Nhân viên", "Employee ID" *(tuỳ chọn — phiếu sẽ hiện STT thay nếu thiếu)* |
 | Thực nhận | "Thực nhận", "Thực lĩnh", "Net Pay" |
+| Code (loại NV) | "Code" — giá trị `ON` (chính thức) / `Intern` (thử việc) / `CTV` *(tuỳ chọn)* |
 
-Ngoài ra app tự nhận các cột thu nhập (lương, thưởng, phụ cấp, OT...) và khấu trừ (BHXH, thuế TNCN...).
+App tự nhận:
+- Các khoản trong **Tổng lương** (chính thức): Lương cơ bản, Thưởng hiệu suất, Xăng xe, Đồng phục, Điện thoại, Ăn trưa
+- Các khoản **thu nhập bổ sung** sau ngày công: OT không chịu thuế, KPI Chuyên cần, Bonus, Incentive, Hỗ trợ nhà ở...
+- Các khoản **khấu trừ**: BHXH, BHYT, BHTN, Thuế TNCN
+- Các cột **tổng tính sẵn**: "Tổng lương", "Tổng lương theo ngày công", "TỔNG THU NHẬP", "Tổng thu nhập sau thuế" — app đọc thẳng giá trị đã tính trong Excel, không tính lại
 
 **Hỗ trợ cột "Kỳ lương"**: Nếu file Excel chứa nhiều tháng (định dạng `MM/YYYY` hoặc `YYYY-MM`), app tự hỏi bạn chọn kỳ nào trước khi tiếp tục.
 
@@ -133,7 +138,7 @@ App tự động nhận diện cột. Nếu mapping chưa đầy đủ (thiếu 
 
 - Kéo thả hoặc dùng dropdown để chỉ định từng cột
 - Có thể thêm/xoá các khoản thu nhập và khấu trừ
-- Nhấn **"Xác nhận"** sau khi đủ 4 cột bắt buộc (Họ tên, Email, Mã NV, Thực nhận)
+- Nhấn **"Tiếp tục"** sau khi đủ 3 cột bắt buộc (Họ tên, Email, Thực nhận). Mã NV là tuỳ chọn — nếu trống, app hiện banner cảnh báo và phiếu sẽ dùng STT làm số phiếu
 
 ### Bước 4: Preview danh sách
 

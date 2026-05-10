@@ -155,20 +155,30 @@ Sub-header merge giải quyết bảng lương 2 cấp phổ biến (VD: hàng 1
 
 Nhận danh sách header string, trả về `Mapping` gợi ý + `complete: boolean`.
 
-### Logic phân loại cột
+### Logic phân loại cột (v0.1.1)
 
 Mỗi cột header được check theo thứ tự ưu tiên:
 
 1. **Required fields**: hoTen, email, maNV, thucNhan — match bằng keyword list
-2. **Optional fields**: viTri, phongBan, ngayCong, ngayCongChuan, giamTruNPT, tongThuNhapSauThue
-3. **Excluded**: các cột tổng hợp trung gian, cột BHXH công ty đóng, cột tham chiếu... → bỏ qua
-4. **ngoaiLuong** (deduction ngoài lương): "tạm ứng", "trừ ngoài lương"...
-5. **ngoaiLuong** (addition ngoài lương): "cộng ngoài lương"...
-6. **FORCE_INCOME**: "OT không chịu thuế" → thu nhập (tránh nhầm với khấu trừ vì có từ "không")
-7. **khauTru**: BHXH, thuế, TNCN...
-8. **thuNhap**: lương, phụ cấp, thưởng, OT...
+2. **Optional fields**: code (exact match), viTri, phongBan, ngayCong, ngayCongChuan, giamTruNPT, tongThuNhapSauThue, tongLuongNgayCongCol, tongThuNhapCol
+3. **Luong paths** (3 paths theo loại NV):
+   - `luongChinhThuc`: cột "Tổng lương" exact match + 6 items (Lương cơ bản, Thưởng hiệu suất, Xăng xe, Đồng phục, Điện thoại, Ăn trưa)
+   - `luongThuViec`: cột "Tổng lương thử việc" + items (Lương thử việc, Hỗ trợ ăn trưa)
+   - `luongCtv`: cột "Tổng lương CTV / thực tập" (no breakdown items)
+4. **Excluded**: các cột tổng hợp trung gian, cột BHXH công ty đóng, cột tham chiếu, cột "Thuế" (Y/N flag exact)... → bỏ qua
+5. **ngoaiLuong** (deduction ngoài lương): "tạm ứng", "trừ ngoài lương"...
+6. **ngoaiLuong** (addition ngoài lương): "cộng ngoài lương"...
+7. **thuNhapBoSung** (sau attendance scaling): OT không chịu thuế, KPI Chuyên cần, Bonus, Incentive, Hỗ trợ nhà ở, Các khoản bổ sung khác...
+8. **khauTru**: BHXH, thuế, TNCN... với canonical labels (Thuế TNCN 10% / lũy tiến, BHXH NV đóng)
 
-Thu nhập sau đó được sort theo `incomeOrder()`: lương cơ bản → lương → thưởng → phụ cấp → OT → bổ sung → bonus → KPI.
+`thuNhapBoSung` được sort theo `incomeOrder()`: OT → bổ sung → hỗ trợ → KPI → thưởng → incentive → bonus.
+
+### Detect loại NV per row
+
+Validator's `classifyRow()` chọn `LuongPath` phù hợp:
+1. Đọc cột `code` (NFD normalize): `on/active/ct` → chính thức, `intern/tv` → thử việc, `ctv/freelance` → CTV
+2. Fallback: cột Tổng lương CTV/thử việc có value > 0 → loại NV tương ứng
+3. Default: chính thức
 
 ---
 
@@ -206,9 +216,11 @@ Mỗi employee được sinh `pdfPassword` = OTP 6 chữ số ngẫu nhiên tạ
 ```
 Employee data
     ↓
-buildHtml() → HTML string (A5, inline CSS, system fonts)
+buildHtml() → HTML string (long page 148mm × auto, inline CSS, system fonts)
     ↓
-htmlToPdf() → BrowserWindow ẩn → loadURL(data:text/html...) → printToPDF()
+htmlToPdf() → BrowserWindow ẩn → loadURL(data:text/html...)
+            → measure scrollHeight runtime
+            → printToPDF({ pageSize: { width: 5.83in, height: <content>in } })
     ↓
 PDF Buffer → write temp file
     ↓
@@ -219,12 +231,13 @@ Encrypted PDF path (temp file)
 emailSender đính kèm → cleanupPdf() xoá file
 ```
 
-### HTML → PDF
+### HTML → PDF (long single page, v0.1.1)
 
-Dùng `BrowserWindow.webContents.printToPDF()` thay vì puppeteer/wkhtmltopdf:
-- Không cần install thêm gì
-- Sử dụng Chromium engine có sẵn trong Electron
-- CSS `@page { size: A5; margin: 10mm }` kiểm soát kích thước trang
+Dùng `BrowserWindow.webContents.printToPDF()`:
+- Không cần install thêm gì (Chromium engine có sẵn trong Electron)
+- CSS `@page { size: 148mm auto; margin: 0 }` + body width 148mm + padding 12mm
+- App đo `document.body.scrollHeight` runtime → convert px → inches (96 DPI) → set `pageSize: { width: 148/25.4 in, height: heightInches }`. Electron 21+ dùng inches, không phải microns.
+- Kết quả: 1 trang dài (148mm width × content height). Mobile scroll mượt, không có page-break giữa các sections.
 
 ### Encryption
 
