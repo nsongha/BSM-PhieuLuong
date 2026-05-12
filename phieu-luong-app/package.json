@@ -78,6 +78,7 @@
       "title": "Phiếu Lương ${version}"
     },
     "win": {
+      "artifactName": "phieu-luong-setup-${version}.${ext}",
       "target": [
         {
           "target": "nsis",

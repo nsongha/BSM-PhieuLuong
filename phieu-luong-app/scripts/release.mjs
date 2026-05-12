@@ -71,7 +71,8 @@ run(`git push && git push --tags`);
 
 // 5. Tạo GitHub Release + upload artifacts
 const releaseDir = resolve(root, 'release');
-const exeFile = `${releaseDir}/Phieu Luong Setup ${newVersion}.exe`;
+// Tên file khớp với artifactName trong package.json: "phieu-luong-setup-${version}.exe"
+const exeFile = `${releaseDir}/phieu-luong-setup-${newVersion}.exe`;
 const latestYml = `${releaseDir}/latest.yml`;
 
 console.log('\n📤 Tạo GitHub Release...\n');

@@ -14,7 +14,7 @@ function createMainWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    title: 'Phiếu Lương',
+    title: `Phiếu Lương v${app.getVersion()}`,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
