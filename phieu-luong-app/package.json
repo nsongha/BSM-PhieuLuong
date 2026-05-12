@@ -1,6 +1,6 @@
 {
   "name": "phieu-luong-app",
-  "version": "0.1.5.0",
+  "version": "0.1.5",
   "description": "Phiếu lương gửi email hàng loạt — Mac Electron app",
   "main": "dist-electron/main.js",
   "scripts": {
