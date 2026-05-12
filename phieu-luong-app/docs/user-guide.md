@@ -118,8 +118,18 @@ File Excel cần có ít nhất các cột sau (tên cột linh hoạt — app t
 App tự nhận:
 - Các khoản trong **Tổng lương** (chính thức): Lương cơ bản, Thưởng hiệu suất, Xăng xe, Đồng phục, Điện thoại, Ăn trưa
 - Các khoản **thu nhập bổ sung** sau ngày công: OT không chịu thuế, KPI Chuyên cần, Bonus, Incentive, Hỗ trợ nhà ở...
-- Các khoản **khấu trừ**: BHXH, BHYT, BHTN, Thuế TNCN
+- Các khoản **khấu trừ**: BHXH, BHYT, BHTN, Thuế TNCN (10%), Thuế TNCN (lũy tiến)
 - Các cột **tổng tính sẵn**: "Tổng lương", "Tổng lương theo ngày công", "TỔNG THU NHẬP", "Tổng thu nhập sau thuế" — app đọc thẳng giá trị đã tính trong Excel, không tính lại
+
+### Layout phiếu lương đồng nhất (v0.2.0)
+
+Phiếu lương xuất ra có 4 thông tin khấu trừ **LUÔN hiển thị** (kể cả khi không có hoặc giá trị = 0 thì in `0 ₫`):
+1. `BHXH NV đóng`
+2. `Mức giảm trừ bản thân & người phụ thuộc`
+3. `Thuế TNCN (10%)`
+4. `Thuế TNCN (lũy tiến)`
+
+Bảng "Cộng / Trừ ngoài lương" cũng luôn hiển thị (rỗng → "— Không có — 0 ₫"). Nhờ vậy phiếu của NV chính thức / thử việc / CTV nhìn nhất quán — không bị "co lại" tuỳ loại.
 
 **Hỗ trợ cột "Kỳ lương"**: Nếu file Excel chứa nhiều tháng (định dạng `MM/YYYY` hoặc `YYYY-MM`), app tự hỏi bạn chọn kỳ nào trước khi tiếp tục.
 

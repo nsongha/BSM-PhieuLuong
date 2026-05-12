@@ -1,6 +1,6 @@
 # Phiếu lương — PDF Layout Spec
 
-> Phiên bản chốt: 2026-05-10 (v0.1.1)
+> Phiên bản chốt: 2026-05-13 (v0.2.0)
 
 ---
 
@@ -32,26 +32,29 @@
 │    ═══ TỔNG THU NHẬP ═══                 │
 ├─────────────────────────────────────────┤
 │ 2. CÁC KHOẢN KHẤU TRỪ (−)               │
-│    items khấu trừ                        │
+│    BHXH NV đóng           ← FIXED SLOT   │
+│    [BHYT, BHTN, Đoàn phí…] (dynamic)     │
+│    Mức giảm trừ NPT       ← FIXED SLOT   │
+│    Thuế TNCN (10%)        ← FIXED SLOT   │
+│    Thuế TNCN (lũy tiến)   ← FIXED SLOT   │
+│    [Thuế TNCN gộp khác]   (dynamic)      │
 │    ═══ TỔNG KHẤU TRỪ ═══                 │
 ├─────────────────────────────────────────┤
-│ 3. THU NHẬP SAU THUẾ (=)                 │
-│    Tổng thu nhập (+)                     │
-│    Tổng các khoản khấu trừ (−)           │
-│    ═══ TỔNG THU NHẬP SAU THUẾ ═══        │
+│ ▓▓ TỔNG THU NHẬP SAU THUẾ ▓▓             │  ← 1-line tinted row
+│    (top border full-width, không bottom) │
 ├─────────────────────────────────────────┤
-│ 4. CỘNG / TRỪ NGOÀI LƯƠNG (±)           │
-│    items only — KHÔNG có subtotal        │
-│    (hide cả section nếu không có items)  │
+│ 3. CỘNG / TRỪ NGOÀI LƯƠNG (±)           │
+│    items ngoài lương (hoặc "0 ₫")        │
+│    ═══ TỔNG CỘNG/TRỪ NGOÀI LƯƠNG ═══     │
 ├─────────────────────────────────────────┤
 │ ══ THỰC NHẬN ══                          │
 │    + Bằng chữ (italic, right-aligned)    │
 ├─────────────────────────────────────────┤
-│ Disclaimer                               │
+│ Disclaimer (2 đoạn, justify, no break)   │
 └─────────────────────────────────────────┘
 ```
 
-**Page size:** 148mm × auto height (long single page, không phân trang). Đo `scrollHeight` runtime → `printToPDF({ pageSize: { width: 5.83in, height: <content>in } })` (Electron 21+ dùng inches).
+**Page size:** 148mm × auto height (long single page, không phân trang). Đo `scrollHeight` runtime — **sau khi `document.fonts.ready` + 2 RAF** để layout settle — rồi `printToPDF({ pageSize: { width: 5.83in, height: <content>in + 0.15" buffer } })` (Electron 21+ dùng inches).
 
 ---
 
@@ -138,9 +141,27 @@ App đọc từ Excel cột `TỔNG THU NHẬP` (= `AM` trong file BSM).
 
 ## Section 2 — Các khoản khấu trừ (−)
 
-Render `khauTru[]` items với prefix `−` và màu đỏ.
+### 4 fixed slots luôn hiển thị (v0.2.0)
 
-**Canonical labels** (auto-mapping rename):
+Bất kể Excel có hay không, 4 thông tin này LUÔN render theo thứ tự cố định:
+
+| Vị trí | Label (canonical) | Khi không có / = 0 |
+|---|---|---|
+| Slot 1 (pre-tax) | `BHXH NV đóng` | `0 ₫` muted (label cũng muted) |
+| Slot 2 (NPT) | `Mức giảm trừ bản thân & người phụ thuộc` | `0 ₫` trong note |
+| Slot 3 (tax) | `Thuế TNCN (10%)` | `0 ₫` muted |
+| Slot 4 (tax) | `Thuế TNCN (lũy tiến)` | `0 ₫` muted |
+
+Khi có giá trị > 0: prefix `−` + màu đỏ (`var(--negative)`).
+Khi = 0 hoặc thiếu: không prefix, màu muted (`var(--muted)`). Layout giữ nguyên giữa NV chính thức / thử việc / CTV — không có "section co lại" tuỳ loại NV.
+
+### Items dynamic (chỉ khi Excel có)
+
+Render giữa các fixed slots theo nhóm:
+- **Pre-tax others** (giữa slot 1 và slot 2): `BHYT`, `BHTN`, `Đoàn phí`, các khoản khác không match 4 slots
+- **Tax others** (sau slot 4): `Thuế TNCN` (gộp, không split), các khoản thuế khác
+
+### Canonical labels (auto-mapping rename)
 
 | Excel header | Display label |
 |---|---|
@@ -150,41 +171,75 @@ Render `khauTru[]` items với prefix `−` và màu đỏ.
 | `Thuế TNCN` (gộp) | `Thuế TNCN` |
 | `BHYT*` / `BHTN*` | `BHYT` / `BHTN` |
 
-**Mức giảm trừ bản thân & NPT:**
+### Mức giảm trừ bản thân & NPT
+
 - Source: field `giamTruNPT`
 - **Không để số tiền ở cột phải** (tránh nhầm với khoản trừ thực tế)
-- Hiển thị số nhỏ italic muted dưới label
-- Không tính vào subtotal
+- Hiển thị số nhỏ italic muted dưới label, fallback `0 ₫` khi `giamTruNPT == null`
+- Không tính vào `Tổng khấu trừ`
 
-**Subtotal Tổng khấu trừ:** bordered emphatic style (top full + bottom shrink underline), label đỏ.
+### Subtotal Tổng khấu trừ
+
+Bordered emphatic style (top full + bottom shrink underline), label đỏ. Tính từ `emp.khauTru[]` thực tế trong data (không gồm 0 ₫ của fixed slots thiếu).
 
 ---
 
-## Section 3 — Thu nhập sau thuế (=)
+## Thu nhập sau thuế — 1-line tinted row (v0.1.5)
 
-Section riêng (tách khỏi Khấu trừ trong v0.1.1). Render khi `emp.tongThuNhapSauThue != null`.
+**Không còn là section đầy đủ** (trước: tiêu đề + 2 dòng chi tiết + subtotal). Giờ là 1 dòng duy nhất chèn giữa Khấu trừ và Ngoài lương.
 
-**Items:**
-- `Tổng thu nhập` — prefix `+`, đen
-- `Tổng các khoản khấu trừ` — prefix `−`, đỏ
+```html
+<div class="net-after-tax-row">
+  <span class="net-after-tax-label">Tổng thu nhập sau thuế</span>
+  <span class="net-after-tax-amount">18.398.000 ₫</span>
+</div>
+```
 
-**Subtotal TỔNG THU NHẬP SAU THUẾ:** bordered emphatic, là tổng phụ của section.
+**Style:**
+- Top border 1px solid ink full-width (kéo ngang toàn bộ phiếu)
+- Background tinted (`var(--paper-tint)` — kem nhạt)
+- **Không có bottom underline**
+- Padding `9px 12px`, label uppercase 12px bold, amount 14px mono bold
+- Margin: 12px top / 20px bottom
 
-App đọc từ Excel cột `Tổng thu nhập sau thuế` (= `AW`).
+**Render condition:** chỉ hiện khi `emp.tongThuNhapSauThue != null`. App đọc thẳng từ Excel cột `Tổng thu nhập sau thuế` (= `AW`).
 
 Math: `Tổng thu nhập − Tổng khấu trừ = Thu nhập sau thuế` (với rounding ±1k).
 
+> **Lý do bỏ section đầy đủ:** 2 dòng chi tiết (Tổng thu nhập + Tổng khấu trừ) đã hiển thị ngay trong 2 bảng phía trên — repeat lại trong section riêng làm phiếu dày + trùng lặp.
+
 ---
 
-## Section 4 — Cộng / Trừ ngoài lương (±)
+## Section 3 — Cộng / Trừ ngoài lương (±)
 
-Hide cả section nếu `ngoaiLuong[]` rỗng.
+**Luôn hiển thị** từ v0.1.5 (kể cả khi `ngoaiLuong[]` rỗng) — section có đủ 3 phần: tiêu đề + nội dung + subtotal.
 
-Items với prefix `+`/`−` rõ ràng. **Không có subtotal** — user đọc từng item riêng.
+### Items
+- Prefix `+` (cộng) / `−` (trừ) rõ ràng
+- Validator filter `soTien !== 0` → chỉ items có biến động
+- Label được clean qua `cleanNgoaiLuongLabel()` — strip phần giải thích trong ngoặc sau dấu `(-)` hoặc `(+)`:
+  - Trước: `Các khoản trừ ngoài lương (-) ( tạm ứng lương, truy thu thuế TNCN...)`
+  - Sau: `Các khoản trừ ngoài lương (-)`
+  - Regex: `/(\([+\-±]\))\s*\([^)]*\)\s*$/`
 
-Validator filter `soTien !== 0` → chỉ items có biến động hiển thị.
+### Khi rỗng
 
-**Mapping convention:**
+```
+— Không có —                                       0 ₫
+                       Tổng cộng / trừ ngoài lương:  0 ₫
+```
+
+Dòng placeholder muted + subtotal 0 ₫. Section không bị mất khỏi phiếu — user luôn biết phần này tồn tại.
+
+### Subtotal
+
+Tổng cộng/trừ với sign rõ ràng:
+- `tongNgoaiLuong > 0` → `+X ₫`
+- `tongNgoaiLuong < 0` → `−X ₫` đỏ
+- `tongNgoaiLuong = 0` → `0 ₫`
+
+### Mapping convention
+
 - Cột "tạm ứng", "trừ ngoài lương" → `isDeduction: true` → validator negate
 - Cột "cộng ngoài lương" → `isDeduction: false` → giữ nguyên dương
 
@@ -310,6 +365,58 @@ File reference đầy đủ multi-path (chính thức / thử việc / CTV): [`d
 
 ---
 
+## Disclaimer (footer)
+
+Đoạn nhỏ cuối phiếu — text muted 9px, line-height 1.6, **text-align: justify** (đọc đoạn dài dễ hơn center).
+
+```
+Thông tin trong phiếu lương là bảo mật, anh/chị vui lòng không chia sẻ
+với những người không liên quan. Mọi hành vi chia sẻ thông tin thu nhập
+không đúng sẽ bị xử lý theo quy định của Công ty.
+
+Mọi thắc mắc vui lòng phản hồi lại email nhận được phiếu lương, đồng
+thời liên hệ Phòng Nhân sự trong vòng 24 giờ kể từ ngày nhận được
+phiếu lương. Sau thời gian này, mặc định anh/chị đồng ý, không có ý
+kiến thắc mắc với thông tin trên phiếu lương.
+```
+
+2 đoạn `<p>` cách nhau 6px margin. Section có:
+- `border-top: 1px solid var(--line)` để tách khỏi nội dung phía trên
+- `break-inside: avoid` + `page-break-inside: avoid` → PDF engine không tách section dù page bị sai số chiều cao (combo với buffer 0.15" ở pageSize)
+
+---
+
+## Page sizing — htmlToPdf pipeline
+
+Long single page sống nhờ đo `scrollHeight` đúng. Trước v0.1.9 đo NGAY sau `loadURL` → font chưa load xong → reflow sau → measure underestimate vài px → disclaimer tràn xuống "trang 2".
+
+### Fix combo (v0.1.9+)
+
+```ts
+const heightPx = await win.webContents.executeJavaScript(`
+  new Promise(resolve => {
+    const measure = () => resolve(Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight,
+      document.body.offsetHeight
+    ));
+    (document.fonts?.ready ?? Promise.resolve())
+      .then(() => requestAnimationFrame(() => requestAnimationFrame(measure)));
+  })
+`);
+// +0.15" buffer chống sai số đo lẻ tẻ (subpixel rounding, font metrics khác platform)
+const heightInches = Math.max(heightPx / 96, 5.83) + 0.15;
+```
+
+3 lớp defense:
+1. **Đợi `document.fonts.ready` + 2 RAF** — layout đã commit, không underestimate (root cause fix)
+2. **Buffer `+0.15"`** — chống sai số dù measure đã chính xác
+3. **`break-inside: avoid` trên `.disclaimer`** — fallback nếu 2 lớp trên vẫn fail edge case
+
+Cost combo: 0 — không slow PDF gen, chỉ thêm vài dòng code.
+
+---
+
 ## Phụ lục — render styling reference
 
 | Element | Class | Style |
@@ -320,3 +427,5 @@ File reference đầy đủ multi-path (chính thức / thử việc / CTV): [`d
 | Subtotal step (Tổng lương theo NC) | `.subtotal-bordered-step` | top + bottom shrink-wrap (cùng độ dài) |
 | Section head | `.section-head` | bg `--paper-tint`, border-bottom 1px solid ink |
 | Total block | `.total-block` | border-top + border-bottom 2px ink, bg trắng |
+| Net after tax row | `.net-after-tax-row` | top border full + bg tinted + NO bottom underline, 1-line |
+| Disclaimer | `.disclaimer` | text-align justify, break-inside avoid, border-top 1px line |

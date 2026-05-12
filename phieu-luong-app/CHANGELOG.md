@@ -5,11 +5,68 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.0] - 2026-05-13
+
+Bản milestone — củng cố phiếu lương PDF sau loạt polish 0.1.5 → 0.1.9.
+
+### Added
+- Bảng "Các khoản khấu trừ" có **4 ô fixed slots luôn hiển thị** dù Excel không có hoặc giá trị = 0:
+  - `BHXH NV đóng`
+  - `Mức giảm trừ bản thân & người phụ thuộc`
+  - `Thuế TNCN (10%)`
+  - `Thuế TNCN (lũy tiến)`
+- Khi slot không có giá trị → in `0 ₫` muted (xám nhạt), không có dấu `−`. Có giá trị → đỏ với prefix `−`. Layout phiếu nhất quán giữa NV chính thức / thử việc / CTV
+- Items khác trong khấu trừ (BHYT, BHTN, Đoàn phí, ...) vẫn dynamic — chỉ hiện khi Excel có
+- Doc sync toàn bộ thay đổi 0.1.5 → 0.2.0 trong `docs/pdf-layout-spec.md`, `architecture.md`, `user-guide.md`, `README.md`
+
+---
+
+## [0.1.9] - 2026-05-12
+
+### Fixed
+- Disclaimer 2 đoạn (bảo mật + thắc mắc 24h) không còn bị tách trang. 3 lớp fix:
+  - Đợi `document.fonts.ready` + 2 RAF trước khi measure `scrollHeight` → layout đã settle, không underestimate
+  - `heightInches += 0.15"` buffer chống sai số đo lẻ tẻ
+  - `.disclaimer` thêm `break-inside: avoid` + `page-break-inside: avoid` để engine không cắt section dù vẫn có sai số
+
+---
+
+## [0.1.8] - 2026-05-12
+
+### Changed
+- Disclaimer thay nội dung: bảo mật thông tin + thắc mắc reply email + liên hệ HR trong 24h (mặc định đồng ý sau thời gian này)
+- CSS đổi `text-align: center` → `justify` để đoạn dài đọc dễ hơn, thêm margin giữa 2 đoạn
+
+---
+
+## [0.1.7] - 2026-05-12
+
+### Fixed
+- Strip phần giải thích trong ngoặc kép sau dấu `(-)` ở label "Các khoản trừ ngoài lương" (vd `( tạm ứng lương, truy thu thuế TNCN...)` → bỏ) để đồng nhất với dòng "Các khoản cộng ngoài lương (+)" không có giải thích. Regex `/(\([+\-±]\))\s*\([^)]*\)\s*$/`
+
+---
+
+## [0.1.6] - 2026-05-12
+
+### Added
+- Custom app icon thay icon Electron mặc định (Mac + Windows)
+
+---
+
 ## [0.1.5] - 2026-05-12
 
 ### Changed
 - Phiếu lương — phần "Thu nhập sau thuế": rút gọn từ section đầy đủ (tiêu đề + 2 dòng chi tiết + tổng) còn 1 dòng tổng duy nhất, top border full-width, tinted bg, không bottom underline → trực quan hơn, đỡ trùng lặp số liệu đã có ở 2 bảng trên
 - Phiếu lương — phần "Cộng / Trừ ngoài lương": luôn hiển thị (kể cả khi không có khoản nào) với đủ tiêu đề + nội dung + tổng. Khi rỗng → dòng "— Không có — 0 ₫" và tổng cộng 0 ₫ → user luôn thấy section này không bị mất khi không có biến động
+
+---
+
+## [0.1.2 – 0.1.4] - 2026-05-12
+
+### Fixed
+- electron-builder `artifactName` khớp đúng filename trong `latest.yml` — auto-updater không còn fail vì không tìm thấy file
+- Title bar hiển thị version (`Phiếu Lương v0.1.x`) để user xác định bản đang chạy
+- Update dialog truyền `mainWindow` làm parent → dialog không bị khuất sau cửa sổ chính trên Windows
 
 ---
 

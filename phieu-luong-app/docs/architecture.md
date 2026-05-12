@@ -231,13 +231,31 @@ Encrypted PDF path (temp file)
 emailSender đính kèm → cleanupPdf() xoá file
 ```
 
-### HTML → PDF (long single page, v0.1.1)
+### HTML → PDF (long single page, v0.1.1 → v0.1.9 fix)
 
 Dùng `BrowserWindow.webContents.printToPDF()`:
 - Không cần install thêm gì (Chromium engine có sẵn trong Electron)
 - CSS `@page { size: 148mm auto; margin: 0 }` + body width 148mm + padding 12mm
 - App đo `document.body.scrollHeight` runtime → convert px → inches (96 DPI) → set `pageSize: { width: 148/25.4 in, height: heightInches }`. Electron 21+ dùng inches, không phải microns.
 - Kết quả: 1 trang dài (148mm width × content height). Mobile scroll mượt, không có page-break giữa các sections.
+
+**v0.1.9 — measure timing fix.** Trước đó đo NGAY sau `loadURL` → font chưa load xong → reflow sau làm content cao hơn → disclaimer cuối phiếu tràn xuống "trang 2". Fix combo 3 lớp:
+1. Đợi `document.fonts.ready` + 2 `requestAnimationFrame` trước khi đo — layout đã commit
+2. `heightInches += 0.15"` buffer chống sai số subpixel
+3. `.disclaimer` thêm `break-inside: avoid` + `page-break-inside: avoid` (CSS fragmentation hint)
+
+### Layout sections (v0.2.0)
+
+`buildHtml()` render theo thứ tự:
+1. **Masthead** — logo + số phiếu + kỳ + ngày phát hành
+2. **Info grid** — 2 nhóm fixed positions (họ tên/mã NV/chức danh/email + ngày công)
+3. **Thu nhập** (3 step: Tổng lương → Tổng lương theo ngày công → Tổng thu nhập)
+4. **Khấu trừ** — **4 fixed slots luôn render**: `BHXH NV đóng`, `Mức giảm trừ NPT`, `Thuế TNCN (10%)`, `Thuế TNCN (lũy tiến)`. Thiếu hoặc = 0 → `0 ₫` muted. Items khác (BHYT, BHTN, Đoàn phí, ...) dynamic. Tổng khấu trừ tính từ `emp.khauTru[]` thực tế.
+5. **Tổng thu nhập sau thuế** — 1 dòng tinted bg, top border full-width, không section đầy đủ (compact hơn từ v0.1.5)
+6. **Cộng / Trừ ngoài lương** — luôn render (rỗng → "— Không có — 0 ₫" + subtotal 0 ₫). Label clean qua `cleanNgoaiLuongLabel()` strip phần giải thích trong ngoặc sau dấu `(-)`/`(+)`
+7. **Thực nhận** — block đen trắng, 32px font-weight 900 + bằng chữ italic right-aligned
+8. **Phụ lục** (nếu có)
+9. **Disclaimer** — 2 đoạn justify, `break-inside: avoid`
 
 ### Encryption
 
