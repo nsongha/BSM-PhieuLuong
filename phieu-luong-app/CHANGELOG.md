@@ -5,6 +5,14 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.1.5] - 2026-05-12
+
+### Changed
+- Phiếu lương — phần "Thu nhập sau thuế": rút gọn từ section đầy đủ (tiêu đề + 2 dòng chi tiết + tổng) còn 1 dòng tổng duy nhất, top border full-width, tinted bg, không bottom underline → trực quan hơn, đỡ trùng lặp số liệu đã có ở 2 bảng trên
+- Phiếu lương — phần "Cộng / Trừ ngoài lương": luôn hiển thị (kể cả khi không có khoản nào) với đủ tiêu đề + nội dung + tổng. Khi rỗng → dòng "— Không có — 0 ₫" và tổng cộng 0 ₫ → user luôn thấy section này không bị mất khi không có biến động
+
+---
+
 ## [0.1.1] - 2026-05-10
 
 ### Added
