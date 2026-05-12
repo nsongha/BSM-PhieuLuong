@@ -347,23 +347,57 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
 
   // Tách khấu trừ thành 2 phần: BHXH-style (trước thuế) và thuế (TNCN, lũy tiến…).
   // Mức giảm trừ NPT chèn giữa — vì nó dùng để tính thuế, đứng ngay trước Thuế TNCN.
+  // 4 fixed slots LUÔN hiển thị (0 ₫ nếu thiếu): BHXH NV đóng, NPT, Thuế TNCN
+  // (10%), Thuế TNCN (lũy tiến). Các khoản khác (BHYT, BHTN, Đoàn phí, "Thuế
+  // TNCN" không split…) render dynamic chỉ khi Excel có.
   const isTaxRow = (label: string) => /thuế|tncn|tax/i.test(label);
+  const FIXED_SLOT_LABELS = new Set([
+    'BHXH NV đóng',
+    'Thuế TNCN (10%)',
+    'Thuế TNCN (lũy tiến)',
+  ]);
   const renderKhauTruRow = (i: { nhan: string; soTien: number; note?: string }) => `
       <div class="row">
         <div class="row-label">${escapeHtml(i.nhan)}${i.note ? `<div class="note">${escapeHtml(i.note)}</div>` : ''}</div>
         <div class="row-amount neg">−${formatCurrency(i.soTien)}</div>
       </div>`;
-  const khauTruPreTax = emp.khauTru.filter((i) => !isTaxRow(i.nhan)).map(renderKhauTruRow).join('');
-  const khauTruTax = emp.khauTru.filter((i) => isTaxRow(i.nhan)).map(renderKhauTruRow).join('');
+  // Fixed slot row: 0 ₫ muted nếu không có hoặc =0, neg đỏ nếu >0
+  const renderKhauTruSlot = (label: string) => {
+    const found = emp.khauTru.find((i) => i.nhan === label);
+    const soTien = found?.soTien ?? 0;
+    const isZero = soTien === 0;
+    return `
+      <div class="row">
+        <div class="row-label"${isZero ? ' style="color:var(--muted)"' : ''}>${escapeHtml(label)}</div>
+        <div class="row-amount${isZero ? ' muted' : ' neg'}">${isZero ? '' : '−'}${formatCurrency(soTien)}</div>
+      </div>`;
+  };
 
-  const giamTruNPTHtml = emp.giamTruNPT != null ? `
+  // Pre-tax: slot BHXH NV đóng (always) + others (BHYT/BHTN/Đoàn phí…) dynamic
+  const khauTruPreTaxOthers = emp.khauTru
+    .filter((i) => !isTaxRow(i.nhan) && !FIXED_SLOT_LABELS.has(i.nhan))
+    .map(renderKhauTruRow)
+    .join('');
+  const khauTruPreTax = renderKhauTruSlot('BHXH NV đóng') + khauTruPreTaxOthers;
+
+  // NPT slot: always render với value hoặc 0 ₫
+  const giamTruNPTHtml = `
       <div class="row">
         <div class="row-label">Mức giảm trừ bản thân &amp; người phụ thuộc
-          <div class="note">${formatCurrency(emp.giamTruNPT)}</div>
+          <div class="note">${formatCurrency(emp.giamTruNPT ?? 0)}</div>
         </div>
-      </div>` : '';
+      </div>`;
 
-  const khauTruEmpty = !khauTruPreTax && !khauTruTax && !giamTruNPTHtml;
+  // Tax: 2 slots Thuế TNCN (10%) + (lũy tiến) always + other tax items dynamic
+  const khauTruTaxOthers = emp.khauTru
+    .filter((i) => isTaxRow(i.nhan) && !FIXED_SLOT_LABELS.has(i.nhan))
+    .map(renderKhauTruRow)
+    .join('');
+  const khauTruTax = renderKhauTruSlot('Thuế TNCN (10%)')
+    + renderKhauTruSlot('Thuế TNCN (lũy tiến)')
+    + khauTruTaxOthers;
+
+  // Section không bao giờ rỗng nữa (4 fixed slots luôn render).
 
   // Tổng thu nhập sau thuế đã đổi tên là "Thu nhập sau thuế" và gộp vào cuối Bảng Khấu trừ.
   const tongThuNhapSauThueHtml = '';
@@ -990,7 +1024,6 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
       <span class="section-title">Các khoản khấu trừ</span>
       <span class="section-hint">(−)</span>
     </div>
-    ${khauTruEmpty ? '<div class="row"><div class="row-label" style="color:var(--muted)">— Không có —</div></div>' : ''}
     ${khauTruPreTax}
     ${giamTruNPTHtml}
     ${khauTruTax}
