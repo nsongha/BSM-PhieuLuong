@@ -1,6 +1,6 @@
 {
   "name": "phieu-luong-app",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Phiếu lương gửi email hàng loạt — Mac Electron app",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -79,6 +79,7 @@
     },
     "win": {
       "artifactName": "phieu-luong-setup-${version}.${ext}",
+      "icon": "assets/icon.ico",
       "target": [
         {
           "target": "nsis",
