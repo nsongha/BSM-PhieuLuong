@@ -373,16 +373,25 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     })
     .join('');
 
-  // Bảng Ngoài lương: chỉ hiển thị item có biến động (validator đã filter soTien !== 0).
-  // Không có subtotal — mỗi item đã rõ +/− và section hint là (±). Hide cả section nếu rỗng.
-  const ngoaiLuongSection = (emp.ngoaiLuong ?? []).length > 0 ? `
+  // Bảng Ngoài lương: luôn hiển thị (kể cả khi rỗng → "0đ"), có title + nội dung + total.
+  const hasNgoaiLuong = (emp.ngoaiLuong ?? []).length > 0;
+  const ngoaiLuongTotalSign = tongNgoaiLuong < 0 ? '−' : (tongNgoaiLuong > 0 ? '+' : '');
+  const ngoaiLuongSection = `
   <section class="section">
     <div class="section-head">
       <span class="section-title">Cộng / Trừ ngoài lương</span>
       <span class="section-hint">(±)</span>
     </div>
-    ${ngoaiLuongRows}
-  </section>` : '';
+    ${hasNgoaiLuong
+      ? ngoaiLuongRows
+      : `<div class="row"><div class="row-label" style="color:var(--muted)">— Không có —</div><div class="row-amount muted">${formatCurrency(0)}</div></div>`}
+    <div class="subtotal-bordered">
+      <div class="subtotal-bordered-inner">
+        <span class="label">Tổng cộng / trừ ngoài lương:</span>
+        <span class="amount"${tongNgoaiLuong < 0 ? ' style="color:var(--negative)"' : ''}>${ngoaiLuongTotalSign}${formatCurrency(Math.abs(tongNgoaiLuong))}</span>
+      </div>
+    </div>
+  </section>`;
 
   // Info group 1: 4 ô fixed positions (top-left/top-right/bottom-left/bottom-right).
   // Cell luôn render dù value rỗng → các ô khác giữ nguyên vị trí.
@@ -563,15 +572,31 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
   .row-amount.neg { color: var(--negative); }
   .row-amount.muted { color: var(--muted); }
 
-  /* Tổng thu nhập sau thuế — dùng section-head shape, override amount style */
-  .net-after-tax { margin-bottom: 28px; }
+  /* Tổng thu nhập sau thuế — single row, không section. Top border full-width,
+     tinted bg, không bottom underline. Đứng giữa bảng Khấu trừ và Ngoài lương. */
+  .net-after-tax-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    background: var(--paper-tint);
+    padding: 9px 12px;
+    border-top: 1px solid var(--ink);
+    margin-top: 12px;
+    margin-bottom: 20px;
+  }
+  .net-after-tax-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+  }
   .net-after-tax-amount {
     font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
-    text-transform: none;
-    letter-spacing: 0;
+    color: var(--ink);
   }
 
   /* Subtotal ITALIC — Tổng lương (subtle).
@@ -967,26 +992,10 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
   </section>
 
   ${emp.tongThuNhapSauThue != null ? `
-  <section class="section">
-    <div class="section-head">
-      <span class="section-title">Thu nhập sau thuế</span>
-      <span class="section-hint">(=)</span>
-    </div>
-    <div class="row">
-      <div class="row-label">Tổng thu nhập</div>
-      <div class="row-amount">+${formatCurrency(tongThuNhap)}</div>
-    </div>
-    <div class="row">
-      <div class="row-label">Tổng các khoản khấu trừ</div>
-      <div class="row-amount neg">−${formatCurrency(tongKhauTru)}</div>
-    </div>
-    <div class="subtotal-bordered">
-      <div class="subtotal-bordered-inner">
-        <span class="label">Tổng thu nhập sau thuế:</span>
-        <span class="amount">${formatCurrency(emp.tongThuNhapSauThue)}</span>
-      </div>
-    </div>
-  </section>` : ''}
+  <div class="net-after-tax-row">
+    <span class="net-after-tax-label">Tổng thu nhập sau thuế</span>
+    <span class="net-after-tax-amount">${formatCurrency(emp.tongThuNhapSauThue)}</span>
+  </div>` : ''}
 
   ${tongThuNhapSauThueHtml}
 
