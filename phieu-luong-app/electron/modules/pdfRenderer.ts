@@ -786,6 +786,8 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     color: var(--muted);
     line-height: 1.6;
     text-align: justify;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   .disclaimer p { margin: 0 0 6px 0; }
   .disclaimer p:last-child { margin-bottom: 0; }
@@ -1042,10 +1044,21 @@ async function htmlToPdf(html: string): Promise<Buffer> {
 
     // Đo content height (CSS px @96 DPI) → convert sang inches cho printToPDF.
     // Electron 21+ pageSize dùng INCHES, không phải microns.
-    const heightPx = (await win.webContents.executeJavaScript(
-      `Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight)`
-    )) as number;
-    const heightInches = Math.max(heightPx / 96, 5.83); // tối thiểu = A5 height ratio
+    // Đợi fonts.ready + 2 RAF cho layout settle trước khi đo, nếu không
+    // measure underestimate → content tràn page 2 (đặc biệt là disclaimer dưới cùng).
+    const heightPx = (await win.webContents.executeJavaScript(`
+      new Promise(resolve => {
+        const measure = () => resolve(Math.max(
+          document.body.scrollHeight,
+          document.documentElement.scrollHeight,
+          document.body.offsetHeight
+        ));
+        (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+          .then(() => requestAnimationFrame(() => requestAnimationFrame(measure)));
+      })
+    `)) as number;
+    // +0.15" buffer chống sai số đo (browser scrollHeight đôi khi underestimate vài px).
+    const heightInches = Math.max(heightPx / 96, 5.83) + 0.15;
     const widthInches = 148 / 25.4; // 148mm → 5.8268 in
 
     const pdf = await win.webContents.printToPDF({
