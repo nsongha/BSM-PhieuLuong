@@ -785,8 +785,10 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
     font-size: 9px;
     color: var(--muted);
     line-height: 1.6;
-    text-align: center;
+    text-align: justify;
   }
+  .disclaimer p { margin: 0 0 6px 0; }
+  .disclaimer p:last-child { margin-bottom: 0; }
 
   /* ── Section divider ── */
   .section-divider {
@@ -1019,8 +1021,8 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
   ${buildPhulucHtml(emp.phuluc, monoFonts)}
 
   <div class="disclaimer">
-    Phiếu lương được phát hành theo quy định tại Điều 95 Bộ luật Lao động 2019.<br>
-    Mọi thắc mắc vui lòng liên hệ Phòng Nhân sự trong vòng 07 ngày kể từ ngày nhận.
+    <p>Thông tin trong phiếu lương là bảo mật, anh/chị vui lòng không chia sẻ với những người không liên quan. Mọi hành vi chia sẻ thông tin thu nhập không đúng sẽ bị xử lý theo quy định của Công ty.</p>
+    <p>Mọi thắc mắc vui lòng phản hồi lại email nhận được phiếu lương, đồng thời liên hệ Phòng Nhân sự trong vòng 24 giờ kể từ ngày nhận được phiếu lương. Sau thời gian này, mặc định anh/chị đồng ý, không có ý kiến thắc mắc với thông tin trên phiếu lương.</p>
   </div>
 
 </body>
