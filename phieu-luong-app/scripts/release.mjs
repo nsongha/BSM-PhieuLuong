@@ -15,7 +15,8 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dir, '..');
+const root = resolve(__dir, '..');          // phieu-luong-app/
+const gitRoot = resolve(root, '..');        // PhieuLuong/ (git repo root)
 const pkgPath = resolve(root, 'package.json');
 const versionPath = resolve(root, 'VERSION');
 
@@ -63,11 +64,12 @@ console.log(`✅ VERSION:      ${toFourDigit(oldVersion)} → ${newVersionFour}\
 console.log('📦 Đang build...\n');
 run('npm run build:win', { cwd: root });
 
-// 4. Commit & tag
-run(`git add phieu-luong-app/package.json phieu-luong-app/VERSION`);
-run(`git commit -m "chore: release v${newVersion}"`);
-run(`git tag v${newVersion}`);
-run(`git push && git push --tags`);
+// 4. Commit & tag (chạy từ git root)
+const gitOpts = { cwd: gitRoot };
+run(`git add phieu-luong-app/package.json phieu-luong-app/VERSION`, gitOpts);
+run(`git commit -m "chore: release v${newVersion}"`, gitOpts);
+run(`git tag v${newVersion}`, gitOpts);
+run(`git push && git push --tags`, gitOpts);
 
 // 5. Tạo GitHub Release + upload artifacts
 const releaseDir = resolve(root, 'release');
