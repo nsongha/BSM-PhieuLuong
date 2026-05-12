@@ -176,6 +176,13 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+// Bỏ phần giải thích trong ngoặc sau dấu (+)/(-) ở label ngoài lương.
+// VD: "Các khoản trừ ngoài lương (-) ( tạm ứng lương, truy thu thuế TNCN...)"
+//   → "Các khoản trừ ngoài lương (-)"
+function cleanNgoaiLuongLabel(s: string): string {
+  return s.replace(/(\([+\-±]\))\s*\([^)]*\)\s*$/, '$1').trim();
+}
+
 function buildPhulucHtml(phuluc: Employee['phuluc'], monoFonts: string): string {
   if (!phuluc) return '';
 
@@ -367,7 +374,7 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
       const prefix = neg ? '−' : '+';
       return `
       <div class="row">
-        <div class="row-label">${escapeHtml(i.nhan)}${i.note ? `<div class="note">${escapeHtml(i.note)}</div>` : ''}</div>
+        <div class="row-label">${escapeHtml(cleanNgoaiLuongLabel(i.nhan))}${i.note ? `<div class="note">${escapeHtml(i.note)}</div>` : ''}</div>
         <div class="row-amount${neg ? ' neg' : ''}">${prefix}${formatCurrency(Math.abs(i.soTien))}</div>
       </div>`;
     })
