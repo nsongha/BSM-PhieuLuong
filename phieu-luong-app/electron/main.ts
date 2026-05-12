@@ -48,7 +48,9 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', () => {
-    dialog.showMessageBox({
+    // Truyền mainWindow làm parent để dialog không bị khuất sau cửa sổ chính trên Windows
+    const parent = mainWindow ?? undefined;
+    dialog.showMessageBox(parent as any, {
       type: 'info',
       title: 'Cập nhật sẵn sàng',
       message: 'Đã tải xong phiên bản mới. Khởi động lại để áp dụng?',
