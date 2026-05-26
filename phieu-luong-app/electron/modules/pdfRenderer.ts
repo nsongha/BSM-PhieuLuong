@@ -345,6 +345,7 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
   const ngayCongCalc = hasNgayCongData
     ? `= ${tongLuong.toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ÷ ${emp.ngayCongChuan} × ${emp.ngayCong}`
     : '';
+  const formulaLuongLabel = isNonOfficial ? luongTypeLabel(emp.loaiNV) : 'Tổng lương';
   const tongLuongNgayCongBlock = `
       <div class="subtotal-bordered subtotal-bordered-step">
         <div class="subtotal-bordered-inner">
@@ -354,7 +355,7 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
       </div>
       <div class="formula-note">
         ${ngayCongCalc ? `<span class="calc">${escapeHtml(ngayCongCalc)}</span>` : ''}
-        <span class="desc">(Tổng lương ÷ Ngày công chuẩn × Ngày công thực tế)</span>
+        <span class="desc">(${escapeHtml(formulaLuongLabel)} ÷ Ngày công chuẩn × Ngày công thực tế)</span>
       </div>`;
 
   const hasLuongStep = hasLuongItems || emp.tongLuong != null;
