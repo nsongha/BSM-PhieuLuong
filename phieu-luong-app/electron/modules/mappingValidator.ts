@@ -28,8 +28,9 @@ function fmtVN(n: number): string {
 // Loại NV detection — chuẩn hoá rồi match keyword (không hardcode value cố định)
 const LOAI_NV_KEYWORDS: Record<Exclude<LoaiNV, 'unknown'>, string[]> = {
   chinhThuc: ['on', 'active', 'chinh thuc', 'official', 'ct'],
-  thuViec: ['intern', 'thu viec', 'tv', 'probation', 'tap su'],
-  ctv: ['ctv', 'cong tac vien', 'freelance', 'partner'],
+  thuViec: ['thu viec', 'tv', 'probation', 'tap su'],
+  // intern = thực tập sinh (≠ thử việc) → nhóm cùng CTV/thực tập
+  ctv: ['ctv', 'cong tac vien', 'freelance', 'partner', 'intern', 'thuc tap', 'part-time', 'parttime'],
 };
 
 function normalizeCode(v: unknown): string {

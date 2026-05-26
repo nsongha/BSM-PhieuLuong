@@ -5,6 +5,18 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.1] - 2026-05-26
+
+### Fixed
+- **Intern bị hiển thị lương 0 ₫**: từ khoá `intern` được chuyển từ nhóm `thuViec` sang `ctv` — thực tập sinh (intern) ≠ nhân viên thử việc về mặt pháp lý và nghiệp vụ. Nếu file Excel dùng `Code = Intern`, app giờ đọc đúng cột "Tổng lương CTV / thực tập" thay vì cột thử việc (thường không tồn tại → lương 0 ₫).
+- Bổ sung từ khoá `thuc tap`, `part-time`, `parttime` vào nhóm `ctv` để nhận diện linh hoạt hơn.
+
+### Changed
+- Footer các nút hành động (PreviewScreen, SetupScreen) chuyển từ `sticky bottom` với hiệu ứng glass-blur sang **fixed footer** toàn chiều rộng có đường viền trên — nhất quán và dễ nhìn hơn.
+- Tài liệu `user-guide.md` bổ sung hướng dẫn file có nhân viên thử việc / CTV, làm rõ phân biệt Intern ≠ Thử việc trong bảng giá trị cột Code.
+
+---
+
 ## [0.2.0] - 2026-05-13
 
 Bản milestone — củng cố phiếu lương PDF sau loạt polish 0.1.5 → 0.1.9.

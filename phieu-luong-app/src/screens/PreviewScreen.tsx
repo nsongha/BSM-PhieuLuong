@@ -199,7 +199,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
+    <div className="max-w-4xl mx-auto space-y-5 pb-20">
       <button onClick={onBack} className="btn-ghost">
         <ArrowLeft size={18} />
         Chọn file khác
@@ -393,7 +393,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
         )}
       </Toast>
 
-      <div className="sticky bottom-4 flex justify-between items-center gap-3 bg-[#F8FAFC]/80 backdrop-blur p-3 rounded-xl">
+      <div className="fixed bottom-0 left-0 right-0 z-20 flex justify-between items-center gap-3 bg-white border-t border-slate-200 px-6 py-3">
         <button
           disabled={dryRunning || selectedEmployees.length === 0 || opts.simulate || offlineBlocked}
           onClick={doDryRun}
