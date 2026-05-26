@@ -25,7 +25,7 @@ export type Phuluc = {
   quyenLoi?: PhulucQuyenLoi;
 };
 
-export type LoaiNV = 'chinhThuc' | 'thuViec' | 'ctv' | 'unknown';
+export type LoaiNV = 'chinhThuc' | 'thuViec' | 'ctv' | 'thucTap' | 'unknown';
 
 export type LuongPath = {
   tongCol: string;
