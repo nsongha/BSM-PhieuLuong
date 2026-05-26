@@ -181,10 +181,10 @@ Ngoài cột tổng, nên có thêm các cột breakdown để phiếu lương h
 
 | Loại NV | Cách hiển thị |
 |---|---|
-| Chính thức | Liệt kê từng khoản (Lương cơ bản, Phụ cấp…) → Tổng lương → Tổng lương theo ngày công |
-| Thử việc | **Lương thử việc: X ₫** → Tổng lương theo ngày công |
-| Cộng tác viên | **Lương cộng tác viên: X ₫** → Tổng lương theo ngày công |
-| Thực tập sinh | **Lương thực tập: X ₫** → Tổng lương theo ngày công |
+| Chính thức | Liệt kê từng khoản (Lương cơ bản, Phụ cấp…) → Tổng lương → Tổng lương theo ngày công *(Tổng lương ÷ NC chuẩn × NC thực tế)* |
+| Thử việc | **Lương thử việc: X ₫** → Tổng lương theo ngày công *(Lương thử việc ÷ NC chuẩn × NC thực tế)* |
+| Cộng tác viên | **Lương cộng tác viên: X ₫** → Tổng lương theo ngày công *(Lương cộng tác viên ÷ ...)* |
+| Thực tập sinh | **Lương thực tập: X ₫** → Tổng lương theo ngày công *(Lương thực tập ÷ ...)* |
 
 **Bảng Khấu trừ** có 4 dòng **LUÔN hiển thị** (giá trị = 0 thì in `0 ₫`):
 1. `BHXH NV đóng`

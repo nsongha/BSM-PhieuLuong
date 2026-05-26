@@ -5,6 +5,17 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.3] - 2026-05-26
+
+### Fixed
+- Dòng mô tả công thức ngày công hiển thị đúng tên loại lương thay vì "Tổng lương" chung chung:
+  - Thử việc → *(Lương thử việc ÷ Ngày công chuẩn × Ngày công thực tế)*
+  - Cộng tác viên → *(Lương cộng tác viên ÷ ...)*
+  - Thực tập sinh → *(Lương thực tập ÷ ...)*
+  - Chính thức → *(Tổng lương ÷ ...)* — không đổi
+
+---
+
 ## [0.2.2] - 2026-05-26
 
 ### Added
