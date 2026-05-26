@@ -5,6 +5,22 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.2] - 2026-05-26
+
+### Added
+- Loại nhân viên mới **`thucTap`** (thực tập sinh) — tách riêng khỏi nhóm CTV. Code nhận diện: `Intern`, `thuc tap`, `thuc tap sinh`, `part-time`.
+- Phiếu lương hiển thị **nhãn lương rõ ràng** cho NV không chính thức:
+  - Thử việc → **"Lương thử việc"**
+  - Cộng tác viên → **"Lương cộng tác viên"**
+  - Thực tập sinh → **"Lương thực tập"**
+
+  Thay vì dòng italic mờ "Tổng lương:" trước đây — không cần thiết khi chỉ có 1 khoản.
+
+### Changed
+- `user-guide.md` cập nhật bảng Code và bảng layout phiếu, phân tách rõ 4 loại NV: Chính thức / Thử việc / Cộng tác viên / Thực tập sinh.
+
+---
+
 ## [0.2.1] - 2026-05-26
 
 ### Fixed
