@@ -113,7 +113,7 @@ File Excel cần có ít nhất các cột sau (tên cột linh hoạt — app t
 | Email | "Email", "E-mail" |
 | Mã nhân viên | "Mã NV", "Mã Nhân viên", "Employee ID" *(tuỳ chọn — phiếu sẽ hiện STT thay nếu thiếu)* |
 | Thực nhận | "Thực nhận", "Thực lĩnh", "Net Pay" |
-| Code (loại NV) | "Code" — giá trị `ON` (chính thức) / `Intern` (thử việc) / `CTV` *(tuỳ chọn)* |
+| Code (loại NV) | "Code" — giá trị `ON` (chính thức) / `TV` (thử việc) / `CTV` (cộng tác viên) / `Intern` (thực tập) *(tuỳ chọn)* |
 
 App tự nhận:
 - Các khoản trong **Tổng lương** (chính thức): Lương cơ bản, Thưởng hiệu suất, Xăng xe, Đồng phục, Điện thoại, Ăn trưa
@@ -121,15 +121,78 @@ App tự nhận:
 - Các khoản **khấu trừ**: BHXH, BHYT, BHTN, Thuế TNCN (10%), Thuế TNCN (lũy tiến)
 - Các cột **tổng tính sẵn**: "Tổng lương", "Tổng lương theo ngày công", "TỔNG THU NHẬP", "Tổng thu nhập sau thuế" — app đọc thẳng giá trị đã tính trong Excel, không tính lại
 
-### Layout phiếu lương đồng nhất (v0.2.0)
+### File có nhân viên thử việc hoặc CTV
 
-Phiếu lương xuất ra có 4 thông tin khấu trừ **LUÔN hiển thị** (kể cả khi không có hoặc giá trị = 0 thì in `0 ₫`):
+> ⚠️ Nếu file có nhân viên thử việc hoặc CTV, cần thêm cột và dùng đúng giá trị Code — nếu không, lương thử việc sẽ hiển thị **0 ₫** trên phiếu.
+
+#### Cột Code — bắt buộc khi có nhiều loại nhân viên
+
+Đặt tên cột header là **`Code`** (chính xác). Giá trị trong cột:
+
+| Loại nhân viên | Giá trị được nhận | Ví dụ | Nhãn trên phiếu |
+|---|---|---|---|
+| Chính thức | `ON`, `CT`, `chinh thuc`, `active`, `official` | `ON` | *(hiện chi tiết các khoản)* |
+| Thử việc | `TV`, `thu viec`, `probation`, `tap su` | `TV` | **Lương thử việc** |
+| Cộng tác viên | `CTV`, `cong tac vien`, `freelance`, `partner` | `CTV` | **Lương cộng tác viên** |
+| Thực tập sinh | `Intern`, `thuc tap`, `thuc tap sinh`, `part-time` | `Intern` | **Lương thực tập** |
+
+> **Lưu ý**: `Intern` (thực tập sinh) ≠ `Thử việc` (probation) — đây là hai khái niệm lao động khác nhau. Tuy nhiên cả Intern và CTV thường **dùng chung cột lương** trong file Excel (ví dụ "Tổng lương CTV / thực tập"). Nhãn trên phiếu sẽ hiển thị đúng theo Code.
+
+> ⚠️ **Lưu ý quan trọng**: Không dùng các giá trị chứa chuỗi `on` hoặc `ct` cho nhân viên thử việc/CTV.  
+> Ví dụ sai: `"on-board"`, `"contract-TV"`, `"intern-on"` → app sẽ nhầm thành **chính thức**.  
+> Chỉ cần dùng đúng `TV` hoặc `Intern` là đủ.
+
+#### Cột lương thử việc — bắt buộc có cột tổng
+
+App chỉ đọc được lương thử việc khi có **cột tổng riêng** tên chính xác là:
+
+```
+Tổng lương thử việc
+```
+
+*(Hoa/thường không quan trọng, có thể viết `TỔNG LƯƠNG THỬ VIỆC` hay `tổng lương thử việc` đều được)*
+
+Ngoài cột tổng, nên có thêm các cột breakdown để phiếu lương hiện chi tiết:
+
+| Cột | Tên được nhận |
+|---|---|
+| Lương thử việc (khoản chính) | `Lương thử việc` |
+| Phụ cấp ăn trưa | `Hỗ trợ ăn trưa`, `Ăn trưa` |
+| **Tổng (bắt buộc)** | **`Tổng lương thử việc`** |
+
+#### Ví dụ cấu trúc cột cho file hỗn hợp
+
+```
+| Code | Họ và tên | Email | Lương cơ bản | Lương thử việc | Hỗ trợ ăn trưa | Tổng lương | Tổng lương thử việc | ... | Thực nhận |
+|------|-----------|-------|-------------|----------------|-----------------|------------|---------------------|-----|-----------|
+| ON   | Nguyễn A  | ...   | 10,000,000  |                |                 | 10,500,000 |                     | ... | 9,200,000 |
+| TV   | Trần B    | ...   |             | 6,000,000      | 730,000         |            | 6,730,000           | ... | 6,200,000 |
+| CTV  | Lê C      | ...   |             |                |                 |            |                     | ... | 8,000,000 |
+```
+
+**Quy tắc điền**:
+- Nhân viên chính thức: điền vào cột lương chính thức, **để trống** cột thử việc/CTV
+- Nhân viên thử việc: điền vào cột lương thử việc, **để trống** cột chính thức
+- Cột "Thực nhận" và các cột khấu trừ (BHXH, Thuế...) điền bình thường cho tất cả loại
+
+### Layout phiếu lương đồng nhất (v0.2.0+)
+
+**Bảng Thu nhập:**
+
+| Loại NV | Cách hiển thị |
+|---|---|
+| Chính thức | Liệt kê từng khoản (Lương cơ bản, Phụ cấp…) → Tổng lương → Tổng lương theo ngày công *(Tổng lương ÷ NC chuẩn × NC thực tế)* |
+| Thử việc | **Lương thử việc: X ₫** → Tổng lương theo ngày công *(Lương thử việc ÷ NC chuẩn × NC thực tế)* |
+| Cộng tác viên | **Lương cộng tác viên: X ₫** → Tổng lương theo ngày công *(Lương cộng tác viên ÷ ...)* |
+| Thực tập sinh | **Lương thực tập: X ₫** → Tổng lương theo ngày công *(Lương thực tập ÷ ...)* |
+
+**Bảng Khấu trừ** có 4 dòng **LUÔN hiển thị** (giá trị = 0 thì in `0 ₫`):
 1. `BHXH NV đóng`
 2. `Mức giảm trừ bản thân & người phụ thuộc`
 3. `Thuế TNCN (10%)`
 4. `Thuế TNCN (lũy tiến)`
 
-Bảng "Cộng / Trừ ngoài lương" cũng luôn hiển thị (rỗng → "— Không có — 0 ₫"). Nhờ vậy phiếu của NV chính thức / thử việc / CTV nhìn nhất quán — không bị "co lại" tuỳ loại.
+Bảng "Cộng / Trừ ngoài lương" cũng luôn hiển thị (rỗng → "— Không có — 0 ₫"). Nhờ vậy phiếu của 4 loại NV nhìn nhất quán — không bị "co lại" tuỳ loại.
 
 **Hỗ trợ cột "Kỳ lương"**: Nếu file Excel chứa nhiều tháng (định dạng `MM/YYYY` hoặc `YYYY-MM`), app tự hỏi bạn chọn kỳ nào trước khi tiếp tục.
 

@@ -5,6 +5,45 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.3] - 2026-05-26
+
+### Fixed
+- Dòng mô tả công thức ngày công hiển thị đúng tên loại lương thay vì "Tổng lương" chung chung:
+  - Thử việc → *(Lương thử việc ÷ Ngày công chuẩn × Ngày công thực tế)*
+  - Cộng tác viên → *(Lương cộng tác viên ÷ ...)*
+  - Thực tập sinh → *(Lương thực tập ÷ ...)*
+  - Chính thức → *(Tổng lương ÷ ...)* — không đổi
+
+---
+
+## [0.2.2] - 2026-05-26
+
+### Added
+- Loại nhân viên mới **`thucTap`** (thực tập sinh) — tách riêng khỏi nhóm CTV. Code nhận diện: `Intern`, `thuc tap`, `thuc tap sinh`, `part-time`.
+- Phiếu lương hiển thị **nhãn lương rõ ràng** cho NV không chính thức:
+  - Thử việc → **"Lương thử việc"**
+  - Cộng tác viên → **"Lương cộng tác viên"**
+  - Thực tập sinh → **"Lương thực tập"**
+
+  Thay vì dòng italic mờ "Tổng lương:" trước đây — không cần thiết khi chỉ có 1 khoản.
+
+### Changed
+- `user-guide.md` cập nhật bảng Code và bảng layout phiếu, phân tách rõ 4 loại NV: Chính thức / Thử việc / Cộng tác viên / Thực tập sinh.
+
+---
+
+## [0.2.1] - 2026-05-26
+
+### Fixed
+- **Intern bị hiển thị lương 0 ₫**: từ khoá `intern` được chuyển từ nhóm `thuViec` sang `ctv` — thực tập sinh (intern) ≠ nhân viên thử việc về mặt pháp lý và nghiệp vụ. Nếu file Excel dùng `Code = Intern`, app giờ đọc đúng cột "Tổng lương CTV / thực tập" thay vì cột thử việc (thường không tồn tại → lương 0 ₫).
+- Bổ sung từ khoá `thuc tap`, `part-time`, `parttime` vào nhóm `ctv` để nhận diện linh hoạt hơn.
+
+### Changed
+- Footer các nút hành động (PreviewScreen, SetupScreen) chuyển từ `sticky bottom` với hiệu ứng glass-blur sang **fixed footer** toàn chiều rộng có đường viền trên — nhất quán và dễ nhìn hơn.
+- Tài liệu `user-guide.md` bổ sung hướng dẫn file có nhân viên thử việc / CTV, làm rõ phân biệt Intern ≠ Thử việc trong bảng giá trị cột Code.
+
+---
+
 ## [0.2.0] - 2026-05-13
 
 Bản milestone — củng cố phiếu lương PDF sau loạt polish 0.1.5 → 0.1.9.

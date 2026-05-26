@@ -176,6 +176,14 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+// Nhãn lương theo loại NV — dùng khi không có items chi tiết.
+function luongTypeLabel(loaiNV: Employee['loaiNV']): string {
+  if (loaiNV === 'thuViec') return 'Lương thử việc';
+  if (loaiNV === 'ctv') return 'Lương cộng tác viên';
+  if (loaiNV === 'thucTap') return 'Lương thực tập';
+  return 'Tổng lương';
+}
+
 // Bỏ phần giải thích trong ngoặc sau dấu (+)/(-) ở label ngoài lương.
 // VD: "Các khoản trừ ngoài lương (-) ( tạm ứng lương, truy thu thuế TNCN...)"
 //   → "Các khoản trừ ngoài lương (-)"
@@ -320,7 +328,14 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
       </div>`;
   };
 
+  const hasLuongItems = emp.luong.length > 0;
+  const isNonOfficial = emp.loaiNV === 'thuViec' || emp.loaiNV === 'ctv' || emp.loaiNV === 'thucTap';
   const luongRows = emp.luong.map(renderIncomeRow).join('');
+  // Khi không có items chi tiết (chỉ có tongLuong từ cột tổng) và là NV không chính thức:
+  // hiện 1 dòng có nhãn rõ ràng thay vì dòng italic "Tổng lương:".
+  const singleLuongRow = !hasLuongItems && emp.tongLuong != null && isNonOfficial
+    ? renderIncomeRow({ nhan: luongTypeLabel(emp.loaiNV), soTien: tongLuong })
+    : '';
   const thuNhapBoSungRows = emp.thuNhapBoSung.map(renderIncomeRow).join('');
 
   // Bước ② — Tổng lương theo ngày công là tổng phụ chính của bảng Thu nhập.
@@ -330,6 +345,7 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
   const ngayCongCalc = hasNgayCongData
     ? `= ${tongLuong.toLocaleString('vi-VN', { maximumFractionDigits: 0 })} ÷ ${emp.ngayCongChuan} × ${emp.ngayCong}`
     : '';
+  const formulaLuongLabel = isNonOfficial ? luongTypeLabel(emp.loaiNV) : 'Tổng lương';
   const tongLuongNgayCongBlock = `
       <div class="subtotal-bordered subtotal-bordered-step">
         <div class="subtotal-bordered-inner">
@@ -339,10 +355,10 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
       </div>
       <div class="formula-note">
         ${ngayCongCalc ? `<span class="calc">${escapeHtml(ngayCongCalc)}</span>` : ''}
-        <span class="desc">(Tổng lương ÷ Ngày công chuẩn × Ngày công thực tế)</span>
+        <span class="desc">(${escapeHtml(formulaLuongLabel)} ÷ Ngày công chuẩn × Ngày công thực tế)</span>
       </div>`;
 
-  const hasLuongStep = emp.luong.length > 0 || emp.tongLuong != null;
+  const hasLuongStep = hasLuongItems || emp.tongLuong != null;
   const hasBoSungStep = emp.thuNhapBoSung.length > 0;
 
   // Tách khấu trừ thành 2 phần: BHXH-style (trước thuế) và thuế (TNCN, lũy tiến…).
@@ -1000,13 +1016,14 @@ function buildHtml(emp: Employee, settings: Settings, opts: SendOptions): string
       <span class="section-hint">(+)</span>
     </div>
     ${hasLuongStep ? `
-      ${luongRows}
+      ${hasLuongItems ? luongRows : singleLuongRow}
+      ${hasLuongItems ? `
       <div class="subtotal-italic">
         <div class="subtotal-italic-inner">
           <span class="label">Tổng lương:</span>
           <span class="amount">${formatCurrency(tongLuong)}</span>
         </div>
-      </div>
+      </div>` : ''}
       ${tongLuongNgayCongBlock}
     ` : ''}
     ${hasBoSungStep ? thuNhapBoSungRows : ''}

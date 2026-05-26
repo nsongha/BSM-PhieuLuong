@@ -28,8 +28,10 @@ function fmtVN(n: number): string {
 // Loại NV detection — chuẩn hoá rồi match keyword (không hardcode value cố định)
 const LOAI_NV_KEYWORDS: Record<Exclude<LoaiNV, 'unknown'>, string[]> = {
   chinhThuc: ['on', 'active', 'chinh thuc', 'official', 'ct'],
-  thuViec: ['intern', 'thu viec', 'tv', 'probation', 'tap su'],
+  thuViec: ['thu viec', 'tv', 'probation', 'tap su'],
   ctv: ['ctv', 'cong tac vien', 'freelance', 'partner'],
+  // thucTap = thực tập sinh — riêng biệt với CTV và thử việc
+  thucTap: ['intern', 'thuc tap', 'thuc tap sinh', 'part-time', 'parttime'],
 };
 
 function normalizeCode(v: unknown): string {
@@ -72,6 +74,7 @@ function pickLuongPath(loaiNV: LoaiNV, mapping: Mapping): LuongPath | undefined 
   if (loaiNV === 'chinhThuc') return mapping.luongChinhThuc;
   if (loaiNV === 'thuViec') return mapping.luongThuViec;
   if (loaiNV === 'ctv') return mapping.luongCtv;
+  if (loaiNV === 'thucTap') return mapping.luongCtv; // thực tập dùng chung cột CTV
   return mapping.luongChinhThuc; // unknown → fallback chính thức
 }
 
