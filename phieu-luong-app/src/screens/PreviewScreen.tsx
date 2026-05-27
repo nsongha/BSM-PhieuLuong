@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Eye,
-  EyeOff,
   FlaskConical,
   Send,
   AlertTriangle,
   CheckCircle2,
   X,
   FileText,
-  Mail,
+  SlidersHorizontal,
+  ChevronDown,
 } from 'lucide-react';
-import type { Employee, LogEntry, OpenStatus, Settings, SendOptions } from '../lib/api';
+import type { Employee, OpenStatus, Settings, SendOptions } from '../lib/api';
 import { api } from '../lib/api';
 import { useOnline } from '../lib/useOnline';
+import { Checkbox } from '../components/Checkbox';
+import { StatusPill } from '../components/StatusPill';
+import { SortHeader } from '../components/SortHeader';
 
 type Props = {
   employees: Employee[];
@@ -23,8 +26,31 @@ type Props = {
   onSendReal: (selected: Employee[]) => void;
 };
 
-function formatCurrency(n: number) {
+type SortCol = 'name' | 'email' | 'ma' | 'salary' | 'status' | null;
+type SortDir = 'asc' | 'desc' | null;
+
+type PriorSend = {
+  loggedAt: string;
+  trackToken?: string;
+  dryRun: boolean;
+  testMode: boolean;
+};
+
+type Filters = {
+  status: 'all' | 'unsent' | 'sent-unread' | 'sent-opened';
+  dept: string;
+  empType: 'all' | 'full-time' | 'probation';
+  hideErrors: boolean;
+};
+
+function formatVND(n: number) {
   return n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
+}
+
+function statusRank(prior?: PriorSend, openInfo?: OpenStatus): number {
+  if (!prior) return 1;
+  if (prior.trackToken && openInfo?.opened) return 3;
+  return 2;
 }
 
 export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }: Props) {
@@ -35,33 +61,13 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     () => new Set(valid.map((e) => e.rowIndex))
   );
   const [search, setSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    status: 'all', dept: 'all', empType: 'all', hideErrors: false,
+  });
+  const [sort, setSort] = useState<{ col: SortCol; dir: SortDir }>({ col: null, dir: null });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return employees;
-    return employees.filter(
-      (e) =>
-        e.hoTen.toLowerCase().includes(q) ||
-        e.email.toLowerCase().includes(q) ||
-        e.maNV.toLowerCase().includes(q)
-    );
-  }, [employees, search]);
-
-  const ROW_PAGE = 500;
-  const [visibleCount, setVisibleCount] = useState(ROW_PAGE);
-  useEffect(() => {
-    setVisibleCount(ROW_PAGE); // reset khi search/filter thay đổi
-  }, [search]);
-  const visibleRows = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
-
-  const selectedEmployees = useMemo(
-    () => valid.filter((e) => selected.has(e.rowIndex)),
-    [valid, selected]
-  );
-  const total = useMemo(
-    () => selectedEmployees.reduce((s, e) => s + e.thucNhan, 0),
-    [selectedEmployees]
-  );
+  const filterRef = useRef<HTMLDivElement>(null);
 
   const [dryRunning, setDryRunning] = useState(false);
   const [dryResult, setDryResult] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -71,6 +77,45 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   const online = useOnline();
   const needsNetwork = !opts.simulate;
   const offlineBlocked = needsNetwork && !online;
+
+  const [priorByMaNV, setPriorByMaNV] = useState<Record<string, PriorSend>>({});
+  const [opensByToken, setOpensByToken] = useState<Record<string, OpenStatus>>({});
+  const [trackerError, setTrackerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const logs = await api().log.list();
+      const map: Record<string, PriorSend> = {};
+      for (const l of logs) {
+        if (l.simulate) continue;
+        if (l.month !== opts.month || l.year !== opts.year) continue;
+        for (const r of l.recipients ?? []) {
+          if (r.status !== 'sent') continue;
+          if (!map[r.maNV]) {
+            map[r.maNV] = { loggedAt: l.timestamp, trackToken: r.trackToken, dryRun: !!l.dryRun, testMode: l.testMode };
+          }
+        }
+      }
+      setPriorByMaNV(map);
+      const tokens = Object.values(map).map((p) => p.trackToken).filter((t): t is string => !!t);
+      if (tokens.length > 0 && settings.trackerEndpoint) {
+        const res = await api().tracker.queryOpens(settings.trackerEndpoint, tokens);
+        setOpensByToken(res.tokens);
+        setTrackerError(res.ok ? null : res.error ?? 'Lỗi tracker không xác định');
+      }
+    })().catch(console.error);
+  }, [opts.month, opts.year, settings.trackerEndpoint]);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [filterOpen]);
 
   useEffect(() => {
     if (!dryResult) return;
@@ -84,72 +129,87 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     return () => clearTimeout(id);
   }, [previewShown]);
 
-  // Cross-reference with history: find previous sends for current month/year
-  type PriorSend = {
-    loggedAt: string;
-    trackToken?: string;
-    dryRun: boolean;
-    testMode: boolean;
-  };
-  const [priorByMaNV, setPriorByMaNV] = useState<Record<string, PriorSend>>({});
-  const [opensByToken, setOpensByToken] = useState<Record<string, OpenStatus>>({});
-  const [trackerError, setTrackerError] = useState<string | null>(null);
+  const deptList = useMemo(() => {
+    const set = new Set<string>();
+    employees.forEach((e) => { if (e.phongBan) set.add(e.phongBan); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'vi'));
+  }, [employees]);
 
-  useEffect(() => {
-    (async () => {
-      const logs = await api().log.list();
-      const map: Record<string, PriorSend> = {};
-      for (const l of logs as LogEntry[]) {
-        if (l.simulate) continue; // skip giả lập — không phải gửi thật
-        if (l.month !== opts.month || l.year !== opts.year) continue;
-        for (const r of l.recipients ?? []) {
-          if (r.status !== 'sent') continue;
-          // Keep most recent per maNV (logs arrive newest-first from logStore)
-          if (!map[r.maNV]) {
-            map[r.maNV] = {
-              loggedAt: l.timestamp,
-              trackToken: r.trackToken,
-              dryRun: !!l.dryRun,
-              testMode: l.testMode,
-            };
-          }
+  const displayRows = useMemo(() => {
+    let rows = employees;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter((e) =>
+        e.hoTen.toLowerCase().includes(q) ||
+        e.email.toLowerCase().includes(q) ||
+        e.maNV.toLowerCase().includes(q)
+      );
+    }
+    if (filters.status !== 'all') {
+      rows = rows.filter((e) => {
+        const prior = priorByMaNV[e.maNV];
+        const openInfo = prior?.trackToken ? opensByToken[prior.trackToken] : undefined;
+        if (filters.status === 'unsent') return !prior;
+        if (filters.status === 'sent-unread') return !!prior && !(prior.trackToken && openInfo?.opened);
+        if (filters.status === 'sent-opened') return !!(prior?.trackToken && openInfo?.opened);
+        return true;
+      });
+    }
+    if (filters.dept !== 'all') {
+      rows = rows.filter((e) => e.phongBan === filters.dept);
+    }
+    if (filters.empType !== 'all') {
+      rows = rows.filter((e) => {
+        if (filters.empType === 'full-time') return e.loaiNV === 'chinhThuc';
+        if (filters.empType === 'probation') return e.loaiNV === 'thuViec';
+        return true;
+      });
+    }
+    if (filters.hideErrors) {
+      rows = rows.filter((e) => e.errors.length === 0);
+    }
+    if (sort.col && sort.dir) {
+      rows = [...rows].sort((a, b) => {
+        let cmp = 0;
+        if (sort.col === 'name') cmp = a.hoTen.localeCompare(b.hoTen, 'vi');
+        else if (sort.col === 'email') cmp = a.email.localeCompare(b.email, 'vi');
+        else if (sort.col === 'ma') cmp = a.maNV.localeCompare(b.maNV, 'vi');
+        else if (sort.col === 'salary') cmp = a.thucNhan - b.thucNhan;
+        else if (sort.col === 'status') {
+          const ra = statusRank(priorByMaNV[a.maNV], priorByMaNV[a.maNV]?.trackToken ? opensByToken[priorByMaNV[a.maNV].trackToken!] : undefined);
+          const rb = statusRank(priorByMaNV[b.maNV], priorByMaNV[b.maNV]?.trackToken ? opensByToken[priorByMaNV[b.maNV].trackToken!] : undefined);
+          cmp = ra - rb;
         }
-      }
-      setPriorByMaNV(map);
+        return sort.dir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return rows;
+  }, [employees, search, filters, sort, priorByMaNV, opensByToken]);
 
-      // Fetch open status for tokens
-      const tokens = Object.values(map).map((p) => p.trackToken).filter((t): t is string => !!t);
-      if (tokens.length > 0 && settings.trackerEndpoint) {
-        const res = await api().tracker.queryOpens(settings.trackerEndpoint, tokens);
-        setOpensByToken(res.tokens);
-        setTrackerError(res.ok ? null : res.error ?? 'Lỗi tracker không xác định');
-      }
-    })().catch((e) => console.error('[priorStatus] error:', e));
-  }, [opts.month, opts.year, settings.trackerEndpoint]);
+  const selectedEmployees = useMemo(
+    () => valid.filter((e) => selected.has(e.rowIndex)),
+    [valid, selected]
+  );
+  const totalSelected = useMemo(
+    () => selectedEmployees.reduce((s, e) => s + e.thucNhan, 0),
+    [selectedEmployees]
+  );
 
-  // Nhân viên đang chọn mà đã được gửi THẬT (không phải dry-run/test) cho cùng kỳ
   const selectedDuplicates = useMemo(
-    () =>
-      selectedEmployees.filter((e) => {
-        const p = priorByMaNV[e.maNV];
-        return p && !p.dryRun && !p.testMode;
-      }),
+    () => selectedEmployees.filter((e) => { const p = priorByMaNV[e.maNV]; return p && !p.dryRun && !p.testMode; }),
     [selectedEmployees, priorByMaNV]
   );
 
-  const allSelectedInFiltered =
-    filtered.length > 0 &&
-    filtered.filter((e) => e.errors.length === 0).every((e) => selected.has(e.rowIndex));
+  const validInDisplay = displayRows.filter((e) => e.errors.length === 0);
+  const allSelected = validInDisplay.length > 0 && validInDisplay.every((e) => selected.has(e.rowIndex));
+  const someSelected = validInDisplay.some((e) => selected.has(e.rowIndex));
+  const isIndeterminate = someSelected && !allSelected;
 
-  const toggleAllFiltered = () => {
-    const validFiltered = filtered.filter((e) => e.errors.length === 0);
+  const toggleAll = () => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allSelectedInFiltered) {
-        validFiltered.forEach((e) => next.delete(e.rowIndex));
-      } else {
-        validFiltered.forEach((e) => next.add(e.rowIndex));
-      }
+      if (allSelected) validInDisplay.forEach((e) => next.delete(e.rowIndex));
+      else validInDisplay.forEach((e) => next.add(e.rowIndex));
       return next;
     });
   };
@@ -163,18 +223,22 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     });
   };
 
+  const onSort = (col: string) => {
+    setSort((prev) => {
+      if (prev.col !== col) return { col: col as SortCol, dir: 'asc' };
+      if (prev.dir === 'asc') return { col: col as SortCol, dir: 'desc' };
+      return { col: null, dir: null };
+    });
+  };
+
   const doDryRun = async () => {
     if (selectedEmployees.length === 0) return;
-    setDryRunning(true);
-    setDryResult(null);
+    setDryRunning(true); setDryResult(null);
     try {
       const r = await api().email.dryRun(selectedEmployees, settings, opts);
       if (r.ok) {
         const n = r.sent ?? Math.min(3, selectedEmployees.length);
-        setDryResult({
-          ok: true,
-          msg: `Đã gửi ${n} phiếu mẫu đến ${settings.emailTest}. Mở mail để check layout + mật khẩu OTP. Đợt gửi thử được lưu trong Lịch sử để theo dõi tracking.`,
-        });
+        setDryResult({ ok: true, msg: `Đã gửi ${n} phiếu mẫu đến ${settings.emailTest}. Đợt gửi thử được lưu trong Lịch sử.` });
       } else {
         setDryResult({ ok: false, msg: r.error ?? 'Lỗi không xác định' });
       }
@@ -186,8 +250,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   };
 
   const doPreviewPdf = async (emp: Employee) => {
-    setPreviewingId(emp.rowIndex);
-    setPreviewShown(null);
+    setPreviewingId(emp.rowIndex); setPreviewShown(null);
     try {
       await api().pdf.preview(emp, settings, opts);
       setPreviewShown(emp.hoTen);
@@ -198,228 +261,351 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-5 pb-20">
-      <button onClick={onBack} className="btn-ghost">
-        <ArrowLeft size={18} />
-        Chọn file khác
-      </button>
+  const activeFilterCount = [
+    filters.status !== 'all',
+    filters.dept !== 'all',
+    filters.empType !== 'all',
+    filters.hideErrors,
+  ].filter(Boolean).length;
 
-      <div className="card p-6 space-y-5">
-        <div className="flex items-baseline justify-between flex-wrap gap-2">
-          <h1 className="text-2xl font-bold text-slate-900">Xem trước bảng lương</h1>
-          <div className="text-base text-slate-500">
-            Tháng {opts.month}/{opts.year}
+  const modeBanner = opts.simulate
+    ? { bg: '#F3E8FF', text: '#6B21A8', label: '⚠ ĐANG Ở CHẾ ĐỘ GIẢ LẬP — KHÔNG GỬI ĐẾN EMAIL NHÂN VIÊN' }
+    : opts.testMode
+    ? { bg: '#FEF3C7', text: '#92400E', label: '⚠ ĐANG Ở CHẾ ĐỘ TEST — KHÔNG GỬI ĐẾN EMAIL NHÂN VIÊN' }
+    : null;
+
+  return (
+    <div className="flex flex-col" style={{ background: '#F7F8FA', minHeight: '100%' }}>
+      {modeBanner && (
+        <div
+          className="text-[11px] font-bold tracking-[1px] text-center py-1.5 px-8 flex-shrink-0"
+          style={{ background: modeBanner.bg, color: modeBanner.text }}
+        >
+          {modeBanner.label}
+        </div>
+      )}
+
+      <div
+        className="flex items-center justify-between px-8 pt-5 pb-4 flex-shrink-0 bg-white"
+        style={{ borderBottom: '1px solid #EEF0F3' }}
+      >
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Chọn file khác
+          </button>
+          <span className="w-px h-6 bg-slate-200 flex-shrink-0" />
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400">
+              Tháng {opts.month} / {opts.year}
+            </div>
+            <h1 className="text-lg font-semibold text-slate-900" style={{ letterSpacing: -0.3, lineHeight: 1.2, marginTop: 2 }}>
+              Xem trước bảng lương
+            </h1>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={doDryRun}
+          disabled={dryRunning || selectedEmployees.length === 0 || opts.simulate || offlineBlocked}
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-[7px] rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          title={opts.simulate ? 'Tắt chế độ Giả lập để gửi thử thật' : offlineBlocked ? 'Mất kết nối Internet' : undefined}
+        >
+          <FlaskConical size={13} />
+          {dryRunning ? 'Đang gửi…' : 'Gửi thử'}
+        </button>
+      </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Hợp lệ" value={valid.length} tone="green" />
-          <StatCard label="Có lỗi" value={invalid.length} tone={invalid.length > 0 ? 'red' : 'slate'} />
-          <StatCard label="Đang chọn" value={selectedEmployees.length} tone="blue" />
-          <StatCard label="Tổng tiền" value={formatCurrency(total)} tone="blue" />
+      <div className="px-8 py-5">
+        <div className="grid grid-cols-4 gap-2.5 mb-3.5">
+          {[
+            { label: 'Hợp lệ', value: valid.length },
+            { label: 'Có lỗi', value: invalid.length },
+            { label: 'Đang chọn', value: `${selectedEmployees.length} / ${employees.length}` },
+            { label: 'Tổng tiền', value: formatVND(totalSelected) },
+          ].map(({ label, value }) => (
+            <div
+              key={label}
+              className="bg-white rounded-[10px] px-4 py-3.5"
+              style={{ border: '1px solid #E5E7EB' }}
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400 mb-1">{label}</div>
+              <div
+                className="font-semibold tabular-nums text-slate-900"
+                style={{ fontSize: 22, letterSpacing: -0.4, lineHeight: 1.2 }}
+              >
+                {value}
+              </div>
+            </div>
+          ))}
         </div>
 
         {trackerError && (
-          <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-            <span>Trạng thái "đã mở" có thể không chính xác — {trackerError}</span>
-          </div>
-        )}
-
-        {!opts.simulate && !opts.testMode && selectedDuplicates.length > 0 && (
-          <div className="flex items-start gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-sm text-amber-900">
-            <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-700" />
-            <div>
-              <div className="font-semibold mb-1">
-                {selectedDuplicates.length} nhân viên đã nhận phiếu kỳ {opts.month}/{opts.year} rồi
-              </div>
-              <div>
-                Bấm "Gửi" bây giờ sẽ gửi <b>thêm một lần nữa</b>. Nếu không muốn, hãy bỏ tick cột "Kỳ {opts.month}/{opts.year}" trong bảng trên.
-              </div>
-            </div>
+          <div className="flex items-center gap-2.5 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900 mb-3">
+            <AlertTriangle size={16} className="flex-shrink-0" />
+            Trạng thái "đã mở" có thể không chính xác — {trackerError}
           </div>
         )}
 
         {invalid.length > 0 && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-red-800">
-              <AlertTriangle size={20} />
-              {invalid.length} dòng có lỗi — sẽ KHÔNG được gửi
+          <div
+            className="flex items-start gap-2.5 rounded-[10px] px-3.5 py-3 mb-3"
+            style={{ background: '#FEF2F2', border: '1px solid #FCA5A5' }}
+          >
+            <AlertTriangle size={18} className="flex-shrink-0 mt-0.5 text-red-500" />
+            <div>
+              <div className="text-xs font-semibold text-red-800 mb-1">
+                {invalid.length} dòng có lỗi — sẽ không được gửi
+              </div>
+              <ul className="text-xs text-red-700 space-y-0.5 max-h-24 overflow-y-auto">
+                {invalid.map((e) => (
+                  <li key={e.rowIndex}>Dòng {e.rowIndex + 2} ({e.hoTen || '(trống)'}): {e.errors.join('; ')}</li>
+                ))}
+              </ul>
             </div>
-            <ul className="text-base text-red-700 space-y-1 max-h-40 overflow-y-auto pl-7">
-              {invalid.map((e) => (
-                <li key={e.rowIndex} className="list-disc">
-                  Dòng {e.rowIndex + 2} ({e.hoTen || '(trống)'}): {e.errors.join('; ')}
-                </li>
-              ))}
-            </ul>
           </div>
         )}
 
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 flex-wrap">
+        {!opts.simulate && !opts.testMode && selectedDuplicates.length > 0 && (
+          <div
+            className="flex items-start gap-2.5 rounded-[10px] px-3.5 py-3 mb-3"
+            style={{ background: '#FFFBEB', border: '1px solid #FCD34D' }}
+          >
+            <AlertTriangle size={18} className="flex-shrink-0 mt-0.5 text-amber-500" />
+            <div className="text-xs text-amber-900">
+              <span className="font-semibold">{selectedDuplicates.length} nhân viên</span> đã nhận phiếu kỳ {opts.month}/{opts.year} rồi — gửi thêm sẽ nhận phiếu lần 2.
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2.5 mb-3">
+          <div
+            className="flex-1 flex items-center gap-2 bg-white rounded-lg px-3"
+            style={{ border: '1px solid #E5E7EB', height: 36 }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="flex-shrink-0 text-slate-400">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
+              <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
             <input
               type="search"
               placeholder="Tìm theo tên, email, mã NV…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 min-w-[200px] rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
             />
-            <span className="text-sm text-slate-500">
-              Hiển thị {filtered.length} / {employees.length}
+            <span className="text-[11px] font-medium text-slate-400 flex-shrink-0 whitespace-nowrap">
+              Hiển thị {displayRows.length} / {employees.length}
             </span>
           </div>
 
-          <div className="border border-slate-200 rounded-xl max-h-[30rem] overflow-y-auto">
-            <table className="w-full text-base">
-              <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 z-10">
-                <tr>
-                  <th className="px-3 py-3 w-12 text-center">
-                    <input
-                      type="checkbox"
-                      className="w-5 h-5 accent-brand-600 cursor-pointer"
-                      checked={allSelectedInFiltered}
-                      onChange={toggleAllFiltered}
-                      aria-label="Chọn tất cả"
-                    />
-                  </th>
-                  <th className="px-3 py-3 text-left text-sm font-semibold text-slate-600 w-12">#</th>
-                  <th className="px-3 py-3 text-left text-sm font-semibold text-slate-600">Họ tên</th>
-                  <th className="px-3 py-3 text-left text-sm font-semibold text-slate-600">Email</th>
-                  <th className="px-3 py-3 text-left text-sm font-semibold text-slate-600">Mã NV</th>
-                  <th className="px-3 py-3 text-right text-sm font-semibold text-slate-600">Thực nhận</th>
-                  <th className="px-3 py-3 text-left text-sm font-semibold text-slate-600 w-40">
-                    Kỳ {opts.month}/{opts.year}
-                  </th>
-                  <th className="px-3 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleRows.map((e) => {
-                  const isInvalid = e.errors.length > 0;
-                  const isSelected = selected.has(e.rowIndex);
-                  const prior = priorByMaNV[e.maNV];
-                  const openInfo = prior?.trackToken ? opensByToken[prior.trackToken] : undefined;
-                  return (
-                    <tr
-                      key={e.rowIndex}
-                      className={`border-t border-slate-100 ${
-                        isInvalid
-                          ? 'bg-red-50'
-                          : isSelected
-                          ? 'bg-blue-50/30 hover:bg-blue-50/60'
-                          : 'hover:bg-slate-50'
-                      }`}
-                    >
-                      <td className="px-3 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          disabled={isInvalid}
-                          checked={isSelected}
-                          onChange={() => toggleOne(e.rowIndex)}
-                          className="w-5 h-5 accent-brand-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
-                          aria-label={`Chọn ${e.hoTen}`}
-                        />
-                      </td>
-                      <td className="px-3 py-3 text-slate-500">{e.rowIndex + 1}</td>
-                      <td className="px-3 py-3 font-medium text-slate-900">{e.hoTen}</td>
-                      <td className="px-3 py-3 text-slate-600">{e.email}</td>
-                      <td className="px-3 py-3 text-slate-700">{e.maNV}</td>
-                      <td className="px-3 py-3 text-right tabular-nums font-medium">
-                        {formatCurrency(e.thucNhan)}
-                      </td>
-                      <td className="px-3 py-3">
-                        <PriorStatus prior={prior} openInfo={openInfo} />
-                      </td>
-                      <td className="px-3 py-3">
-                        {!isInvalid && (
-                          <button
-                            disabled={previewingId === e.rowIndex}
-                            onClick={() => doPreviewPdf(e)}
-                            className="inline-flex items-center gap-1 text-brand-600 hover:underline text-sm disabled:opacity-50"
-                          >
-                            <Eye size={16} />
-                            {previewingId === e.rowIndex ? 'Đang tạo…' : 'Xem PDF'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filtered.length > visibleCount && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-4 text-center bg-slate-50">
-                      <button
-                        onClick={() => setVisibleCount((c) => c + ROW_PAGE)}
-                        className="btn-secondary"
-                      >
-                        Hiển thị thêm {Math.min(ROW_PAGE, filtered.length - visibleCount)} dòng
-                        <span className="text-sm text-slate-500 ml-2">
-                          (còn {filtered.length - visibleCount})
-                        </span>
-                      </button>
-                    </td>
-                  </tr>
-                )}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-10 text-center text-slate-500">
-                      Không tìm thấy nhân viên nào khớp "{search}"
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div ref={filterRef} className="relative">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setFilterOpen((v) => !v); }}
+              className="flex items-center gap-1.5 text-xs px-3 rounded-lg transition-colors"
+              style={{
+                height: 36,
+                border: `1px solid ${activeFilterCount > 0 ? '#F97316' : '#E5E7EB'}`,
+                background: activeFilterCount > 0 ? '#FFF7ED' : 'white',
+                color: activeFilterCount > 0 ? '#F97316' : '#475569',
+              }}
+            >
+              <SlidersHorizontal size={14} />
+              Bộ lọc
+              {activeFilterCount > 0 && (
+                <span className="bg-cta-500 text-white text-[10px] font-semibold px-1.5 py-px rounded-full leading-none">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown size={12} />
+            </button>
+
+            {filterOpen && (
+              <FilterPopover
+                filters={filters}
+                deptList={deptList}
+                onChange={setFilters}
+                onClose={() => setFilterOpen(false)}
+              />
+            )}
           </div>
         </div>
 
+        {activeFilterCount > 0 && (
+          <div className="flex items-center flex-wrap gap-1.5 mb-3">
+            {filters.status !== 'all' && (
+              <FilterChip label={`Trạng thái: ${filters.status}`} onRemove={() => setFilters((f) => ({ ...f, status: 'all' }))} />
+            )}
+            {filters.dept !== 'all' && (
+              <FilterChip label={`Phòng ban: ${filters.dept}`} onRemove={() => setFilters((f) => ({ ...f, dept: 'all' }))} />
+            )}
+            {filters.empType !== 'all' && (
+              <FilterChip label={`Loại HĐ: ${filters.empType === 'full-time' ? 'Chính thức' : 'Thử việc'}`} onRemove={() => setFilters((f) => ({ ...f, empType: 'all' }))} />
+            )}
+            {filters.hideErrors && (
+              <FilterChip label="Ẩn lỗi" onRemove={() => setFilters((f) => ({ ...f, hideErrors: false }))} />
+            )}
+            <button
+              type="button"
+              onClick={() => setFilters({ status: 'all', dept: 'all', empType: 'all', hideErrors: false })}
+              className="text-[11px] text-cta-500 hover:underline"
+            >
+              Xoá tất cả
+            </button>
+          </div>
+        )}
+
+        <div className="bg-white rounded-[10px] overflow-hidden" style={{ border: '1px solid #E5E7EB' }}>
+          <div
+            className="grid items-center px-4"
+            style={{
+              gridTemplateColumns: '36px 1.7fr 1.6fr 0.9fr 1fr 1.3fr 60px',
+              columnGap: 12,
+              background: '#FAFBFC',
+              borderBottom: '1px solid #E5E7EB',
+              height: 36,
+            }}
+          >
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={allSelected}
+                indeterminate={isIndeterminate}
+                onChange={toggleAll}
+                label="Chọn tất cả"
+              />
+            </div>
+            <SortHeader label="Nhân viên" col="name" activeCol={sort.col} dir={sort.dir} onSort={onSort} />
+            <SortHeader label="Email" col="email" activeCol={sort.col} dir={sort.dir} onSort={onSort} />
+            <SortHeader label="Mã NV" col="ma" activeCol={sort.col} dir={sort.dir} onSort={onSort} />
+            <SortHeader label="Thực nhận" col="salary" activeCol={sort.col} dir={sort.dir} onSort={onSort} align="right" />
+            <SortHeader label="Trạng thái" col="status" activeCol={sort.col} dir={sort.dir} onSort={onSort} />
+            <div />
+          </div>
+
+          <div>
+            {displayRows.map((e, idx) => {
+              const isInvalid = e.errors.length > 0;
+              const isSelected = selected.has(e.rowIndex);
+              const prior = priorByMaNV[e.maNV];
+              const openInfo = prior?.trackToken ? opensByToken[prior.trackToken] : undefined;
+              const isLast = idx === displayRows.length - 1;
+              return (
+                <div
+                  key={e.rowIndex}
+                  className="grid items-center px-4"
+                  style={{
+                    gridTemplateColumns: '36px 1.7fr 1.6fr 0.9fr 1fr 1.3fr 60px',
+                    columnGap: 12,
+                    height: 56,
+                    borderBottom: isLast ? 'none' : '1px solid #EEF0F3',
+                    background: isInvalid ? '#FEF2F2' : isSelected ? '#FFF7ED' : 'transparent',
+                    opacity: isInvalid ? 0.85 : 1,
+                    cursor: isInvalid ? 'not-allowed' : 'default',
+                  }}
+                >
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={isSelected && !isInvalid}
+                      disabled={isInvalid}
+                      onChange={() => !isInvalid && toggleOne(e.rowIndex)}
+                      label={e.hoTen}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-900 truncate">{e.hoTen}</div>
+                    {prior && !prior.dryRun && !prior.testMode && (
+                      <div className="text-[10px] text-amber-600">● đã gửi kỳ này</div>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">{e.email}</div>
+                  <div className="text-[11px] text-slate-500 font-mono tabular-nums">{e.maNV}</div>
+                  <div className="text-sm font-semibold tabular-nums text-slate-900 text-right">{formatVND(e.thucNhan)}</div>
+                  <div>
+                    <StatusPill isInvalid={isInvalid} prior={prior} openInfo={openInfo} />
+                  </div>
+                  <div>
+                    {!isInvalid && (
+                      <button
+                        type="button"
+                        disabled={previewingId === e.rowIndex}
+                        onClick={() => doPreviewPdf(e)}
+                        className="inline-flex items-center gap-1 text-cta-500 hover:underline text-xs disabled:opacity-50"
+                      >
+                        <Eye size={12} />
+                        {previewingId === e.rowIndex ? '…' : 'PDF'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {displayRows.length === 0 && (
+              <div className="py-10 text-center text-sm text-slate-400">
+                Không tìm thấy nhân viên nào khớp với bộ lọc hiện tại
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="flex items-center justify-between px-8 py-3.5 bg-white sticky bottom-0"
+        style={{ borderTop: '1px solid #EEF0F3' }}
+      >
+        <div className="text-xs text-slate-400">
+          Đã chọn <strong className="text-slate-900 font-semibold">{selectedEmployees.length} nhân viên</strong>
+          {' · '}Tổng <strong className="text-slate-900 font-semibold">{formatVND(totalSelected)}</strong>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={dryRunning || selectedEmployees.length === 0 || opts.simulate || offlineBlocked}
+            onClick={doDryRun}
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title={opts.simulate ? 'Tắt chế độ Giả lập để gửi thử thật' : offlineBlocked ? 'Mất kết nối Internet' : undefined}
+          >
+            <FlaskConical size={14} />
+            {dryRunning ? 'Đang gửi thử…' : 'Gửi thử'}
+          </button>
+          <button
+            type="button"
+            disabled={selectedEmployees.length === 0 || offlineBlocked}
+            onClick={() => setShowConfirm(true)}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg text-white transition-colors disabled:cursor-not-allowed"
+            style={{
+              background: selectedEmployees.length === 0 ? '#CBD5E1' : '#F97316',
+              boxShadow: selectedEmployees.length === 0 ? 'none' : '0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(249,115,22,0.35)',
+            }}
+            title={offlineBlocked ? 'Mất kết nối Internet' : undefined}
+          >
+            <Send size={14} />
+            Gửi {selectedEmployees.length} phiếu
+          </button>
+        </div>
       </div>
 
       <Toast>
         {previewShown && (
-          <ToastItem tone="blue" icon={<FileText size={20} />} onDismiss={() => setPreviewShown(null)}>
-            PDF của <b>{previewShown}</b> đã mở trong Preview (không password — khi gửi thật sẽ được encrypt bằng mật khẩu OTP).
+          <ToastItem tone="blue" icon={<FileText size={18} />} onDismiss={() => setPreviewShown(null)}>
+            PDF của <b>{previewShown}</b> đã mở trong Preview.
           </ToastItem>
         )}
         {dryResult && (
           <ToastItem
             tone={dryResult.ok ? 'green' : 'red'}
-            icon={dryResult.ok ? <CheckCircle2 size={20} /> : <AlertTriangle size={20} />}
+            icon={dryResult.ok ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
             onDismiss={() => setDryResult(null)}
           >
             {dryResult.msg}
           </ToastItem>
         )}
       </Toast>
-
-      <div className="fixed bottom-0 left-0 right-0 z-20 flex justify-between items-center gap-3 bg-white border-t border-slate-200 px-6 py-3">
-        <button
-          disabled={dryRunning || selectedEmployees.length === 0 || opts.simulate || offlineBlocked}
-          onClick={doDryRun}
-          className="btn-secondary"
-          title={
-            opts.simulate
-              ? 'Tắt chế độ Giả lập để gửi thử thật'
-              : offlineBlocked
-              ? 'Mất kết nối Internet'
-              : undefined
-          }
-        >
-          <FlaskConical size={18} />
-          {dryRunning ? 'Đang gửi thử…' : 'Gửi thử'}
-        </button>
-        <button
-          disabled={selectedEmployees.length === 0 || offlineBlocked}
-          onClick={() => setShowConfirm(true)}
-          className="btn-primary"
-          title={offlineBlocked ? 'Mất kết nối Internet' : undefined}
-        >
-          <Send size={20} />
-          Gửi {selectedEmployees.length} phiếu
-          {selectedEmployees.length !== valid.length && ` / ${valid.length}`}
-        </button>
-      </div>
 
       {showConfirm && (
         <ConfirmModal
@@ -428,61 +614,128 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
           opts={opts}
           emailTest={settings.emailTest}
           onCancel={() => setShowConfirm(false)}
-          onConfirm={() => {
-            setShowConfirm(false);
-            onSendReal(selectedEmployees);
-          }}
+          onConfirm={() => { setShowConfirm(false); onSendReal(selectedEmployees); }}
         />
       )}
     </div>
   );
 }
 
-function PriorStatus({
-  prior,
-  openInfo,
-}: {
-  prior?: { loggedAt: string; trackToken?: string; dryRun: boolean; testMode: boolean };
-  openInfo?: OpenStatus;
-}) {
-  if (!prior) {
-    return <span className="text-sm text-slate-400">— Chưa gửi</span>;
-  }
-  const rel = relative(new Date(prior.loggedAt));
-  const label = prior.dryRun ? 'Thử' : prior.testMode ? 'Test' : 'Gửi';
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <div className="space-y-0.5 text-sm">
-      <div className="inline-flex items-center gap-1.5 text-green-700 font-medium" title={new Date(prior.loggedAt).toLocaleString('vi-VN')}>
-        <Mail size={14} />
-        {label} {rel}
-      </div>
-      {prior.trackToken && (
-        <div className="block">
-          {openInfo?.opened ? (
-            <span className="inline-flex items-center gap-1 text-blue-700 text-xs" title={`${openInfo.count} lần mở`}>
-              <Eye size={12} /> Đã mở
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-slate-400 text-xs">
-              <EyeOff size={12} /> Chưa mở
-            </span>
-          )}
-        </div>
-      )}
-    </div>
+    <span
+      className="inline-flex items-center gap-1 text-[11px] font-medium text-cta-500 pr-1 pl-2.5"
+      style={{ background: '#FFF7ED', border: '1px solid rgba(249,115,22,0.2)', borderRadius: 999, height: 24 }}
+    >
+      {label}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="flex items-center justify-center rounded-full hover:bg-cta-500/10 transition-colors"
+        style={{ width: 16, height: 16 }}
+      >
+        <X size={10} />
+      </button>
+    </span>
   );
 }
 
-function relative(d: Date): string {
-  const diffMs = Date.now() - d.getTime();
-  const m = Math.floor(diffMs / 60000);
-  if (m < 1) return 'vừa xong';
-  if (m < 60) return `${m} phút trước`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h trước`;
-  const days = Math.floor(h / 24);
-  if (days < 7) return `${days} ngày trước`;
-  return d.toLocaleDateString('vi-VN');
+function FilterPopover({
+  filters,
+  deptList,
+  onChange,
+  onClose,
+}: {
+  filters: Filters;
+  deptList: string[];
+  onChange: (f: Filters) => void;
+  onClose: () => void;
+}) {
+  const [local, setLocal] = useState<Filters>(filters);
+
+  const ChipOpt = ({ value, current, label, onSelect }: { value: string; current: string; label: string; onSelect: () => void }) => (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="text-xs px-3 py-1.5 transition-colors"
+      style={{
+        borderRadius: 999,
+        border: `1px solid ${current === value ? '#F97316' : '#E5E7EB'}`,
+        background: current === value ? '#FFF7ED' : 'white',
+        color: current === value ? '#F97316' : '#475569',
+        fontWeight: current === value ? 600 : 400,
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div
+      className="absolute top-[calc(100%+6px)] right-0 z-30 bg-white rounded-xl p-4 space-y-3"
+      style={{
+        width: 360,
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 12px 32px rgba(15,23,42,0.12), 0 2px 4px rgba(15,23,42,0.06)',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-slate-900">Bộ lọc</span>
+        <button type="button" onClick={() => setLocal({ status: 'all', dept: 'all', empType: 'all', hideErrors: false })} className="text-xs text-cta-500 hover:underline">
+          Reset
+        </button>
+      </div>
+
+      <div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400 mb-2">Trạng thái gửi</div>
+        <div className="flex flex-wrap gap-1.5">
+          {([['all', 'Tất cả'], ['unsent', 'Chưa gửi'], ['sent-unread', 'Đã gửi'], ['sent-opened', 'Đã mở']] as const).map(([v, l]) => (
+            <ChipOpt key={v} value={v} current={local.status} label={l} onSelect={() => setLocal((f) => ({ ...f, status: v }))} />
+          ))}
+        </div>
+      </div>
+
+      {deptList.length > 0 && (
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400 mb-2">Phòng ban</div>
+          <div className="flex flex-wrap gap-1.5">
+            <ChipOpt value="all" current={local.dept} label="Tất cả" onSelect={() => setLocal((f) => ({ ...f, dept: 'all' }))} />
+            {deptList.map((d) => (
+              <ChipOpt key={d} value={d} current={local.dept} label={d} onSelect={() => setLocal((f) => ({ ...f, dept: d }))} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400 mb-2">Loại hợp đồng</div>
+        <div className="flex flex-wrap gap-1.5">
+          {([['all', 'Tất cả'], ['full-time', 'Chính thức'], ['probation', 'Thử việc']] as const).map(([v, l]) => (
+            <ChipOpt key={v} value={v} current={local.empType} label={l} onSelect={() => setLocal((f) => ({ ...f, empType: v }))} />
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+        <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+          <Checkbox
+            checked={local.hideErrors}
+            onChange={() => setLocal((f) => ({ ...f, hideErrors: !f.hideErrors }))}
+            label="Ẩn dòng có lỗi"
+          />
+          Ẩn dòng có lỗi
+        </label>
+        <button
+          type="button"
+          onClick={() => { onChange(local); onClose(); }}
+          className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-cta-500 hover:bg-cta-600 transition-colors"
+        >
+          Áp dụng
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Toast({ children }: { children: React.ReactNode }) {
@@ -493,126 +746,67 @@ function Toast({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ToastItem({
-  tone,
-  icon,
-  children,
-  onDismiss,
-}: {
-  tone: 'blue' | 'green' | 'red';
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  onDismiss: () => void;
-}) {
-  const colors: Record<typeof tone, string> = {
-    blue: 'bg-blue-50 border-blue-300 text-blue-900',
-    green: 'bg-green-50 border-green-300 text-green-900',
-    red: 'bg-red-50 border-red-300 text-red-900',
-  };
+function ToastItem({ tone, icon, children, onDismiss }: { tone: 'blue' | 'green' | 'red'; icon: React.ReactNode; children: React.ReactNode; onDismiss: () => void }) {
+  const colors = { blue: 'bg-blue-50 border-blue-300 text-blue-900', green: 'bg-green-50 border-green-300 text-green-900', red: 'bg-red-50 border-red-300 text-red-900' };
   return (
-    <div
-      className={`flex items-start justify-between gap-3 rounded-xl border-2 p-4 shadow-lg pointer-events-auto animate-[slide-down_200ms_ease-out] ${colors[tone]}`}
-    >
-      <div className="flex items-start gap-3 flex-1">
-        <span className="mt-0.5">{icon}</span>
-        <div className="text-base">{children}</div>
-      </div>
-      <button onClick={onDismiss} className="text-slate-500 hover:text-slate-800">
-        <X size={20} />
-      </button>
+    <div className={`flex items-start justify-between gap-3 rounded-xl border-2 p-4 shadow-lg pointer-events-auto ${colors[tone]}`}>
+      <div className="flex items-start gap-3 flex-1"><span className="mt-0.5">{icon}</span><div className="text-sm">{children}</div></div>
+      <button onClick={onDismiss} className="text-slate-500 hover:text-slate-800"><X size={18} /></button>
     </div>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  tone: 'green' | 'red' | 'blue' | 'slate';
-}) {
-  const colors: Record<typeof tone, string> = {
-    green: 'border-green-200 bg-green-50 text-green-800',
-    red: 'border-red-200 bg-red-50 text-red-800',
-    blue: 'border-brand-200 bg-brand-50 text-brand-800',
-    slate: 'border-slate-200 bg-slate-50 text-slate-700',
-  };
-  return (
-    <div className={`rounded-xl border p-4 ${colors[tone]}`}>
-      <div className="text-sm uppercase tracking-wide opacity-80">{label}</div>
-      <div className="text-2xl font-bold mt-1">{value}</div>
-    </div>
-  );
-}
-
-function ConfirmModal({
-  count,
-  duplicates,
-  opts,
-  emailTest,
-  onCancel,
-  onConfirm,
-}: {
-  count: number;
-  duplicates: number;
-  opts: SendOptions;
-  emailTest: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
+function ConfirmModal({ count, duplicates, opts, emailTest, onCancel, onConfirm }: { count: number; duplicates: number; opts: SendOptions; emailTest: string; onCancel: () => void; onConfirm: () => void }) {
   const isSim = opts.simulate;
   const isTest = opts.testMode && !isSim;
   const showDupWarning = !isSim && !isTest && duplicates > 0;
+  const eyebrow = isSim ? 'CHẾ ĐỘ GIẢ LẬP' : isTest ? 'CHẾ ĐỘ TEST' : 'XÁC NHẬN GỬI';
+  const title = isSim ? `Giả lập ${count} phiếu` : isTest ? `Gửi test ${count} phiếu` : `Gửi ${count} phiếu lương`;
+  const confirmLabel = isSim ? 'Gửi giả lập' : isTest ? 'Gửi test' : 'Gửi thật';
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-7 max-w-md w-full space-y-5">
-        {isSim ? (
-          <>
-            <h2 className="text-2xl font-bold text-purple-800">Chế độ Giả lập</h2>
-            <p className="text-base text-slate-700">
-              <b>{count} phiếu</b> tháng {opts.month}/{opts.year} sẽ được mô phỏng gửi —{' '}
-              <b>không email thật nào được gửi ra ngoài</b>.
-            </p>
-          </>
-        ) : isTest ? (
-          <>
-            <h2 className="text-2xl font-bold text-amber-800">Chế độ Test</h2>
-            <p className="text-base text-slate-700">
-              Toàn bộ <b>{count} phiếu</b> tháng {opts.month}/{opts.year} sẽ gửi đến{' '}
-              <code className="bg-slate-100 px-1.5 py-0.5 rounded">{emailTest}</code>,
-              KHÔNG gửi đến email nhân viên.
-            </p>
-          </>
-        ) : (
-          <>
-            <h2 className="text-2xl font-bold text-slate-900">Xác nhận gửi</h2>
-            <p className="text-base text-slate-700">
-              Sắp gửi <b>{count} phiếu lương</b> tháng {opts.month}/{opts.year} đến{' '}
-              <b>{count}</b> email nhân viên.
-            </p>
-            <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 p-3 rounded-xl">
-              <AlertTriangle size={18} />
-              Không thể hoàn tác.
-            </div>
-          </>
-        )}
-        {showDupWarning && (
-          <div className="flex items-start gap-2 text-sm text-amber-900 bg-amber-50 border-2 border-amber-400 p-3 rounded-xl">
-            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" />
-            <span>
-              <b>{duplicates}</b> trong {count} nhân viên đã được gửi kỳ này rồi — gửi tiếp sẽ nhận phiếu thứ 2.
-            </span>
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl p-6 w-full max-w-[440px] space-y-4"
+        style={{ boxShadow: '0 20px 60px rgba(15,23,42,0.4)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-cta-500">{eyebrow}</div>
+        <h2 className="text-lg font-semibold text-slate-900" style={{ letterSpacing: -0.3 }}>{title}</h2>
+        <p className="text-sm text-slate-500 leading-relaxed">
+          {isSim ? (
+            <><b>{count} phiếu</b> tháng {opts.month}/{opts.year} sẽ được mô phỏng — <b>không email thật nào được gửi ra ngoài</b>.</>
+          ) : isTest ? (
+            <>Toàn bộ <b>{count} phiếu</b> sẽ gửi đến <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">{emailTest}</code>, KHÔNG gửi đến email nhân viên.</>
+          ) : (
+            <>Sắp gửi <b>{count} phiếu lương</b> tháng {opts.month}/{opts.year} đến <b>{count}</b> nhân viên.</>
+          )}
+        </p>
+        {!isSim && !isTest && (
+          <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 p-3 rounded-lg">
+            <AlertTriangle size={16} /> Không thể hoàn tác.
           </div>
         )}
-        <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="btn-secondary">
+        {showDupWarning && (
+          <div className="flex items-start gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-300 p-3 rounded-lg">
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5 text-amber-600" />
+            <span><b>{duplicates}</b> nhân viên đã được gửi kỳ này — sẽ nhận phiếu lần 2.</span>
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onCancel} className="text-sm px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors">
             Huỷ
           </button>
-          <button onClick={onConfirm} className="btn-primary">
-            <Send size={18} />
-            {isSim ? 'Gửi giả lập' : isTest ? 'Gửi test' : 'Gửi thật'}
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg text-white bg-cta-500 hover:bg-cta-600 transition-colors"
+          >
+            <Send size={14} /> {confirmLabel}
           </button>
         </div>
       </div>
