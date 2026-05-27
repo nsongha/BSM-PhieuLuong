@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Roboto', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'Roboto', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         base: ['18px', '1.6'],
@@ -27,6 +27,12 @@ export default {
           500: '#F97316',
           600: '#EA580C',
           700: '#C2410C',
+        },
+        sidebar: {
+          bg: '#0F172A',
+          hover: '#1E293B',
+          text: '#94A3B8',
+          label: '#64748B',
         },
       },
       borderRadius: {
