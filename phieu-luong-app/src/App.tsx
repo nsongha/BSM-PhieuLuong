@@ -65,7 +65,7 @@ export function App() {
   const online = useOnline();
   const [sidebarCollapsed, _setSidebarCollapsed] = useState(false);
   const sidebarActive = (() => {
-    if (route.name === 'preview' || route.name === 'period-pick' || route.name === 'sheet-pick') return 'preview';
+    if (route.name === 'preview' || route.name === 'period-pick' || route.name === 'sheet-pick' || route.name === 'sending') return 'preview';
     if (route.name === 'mapping') return 'mapping';
     if (route.name === 'history') return 'history';
     if (route.name === 'setup') return 'setup';
@@ -220,7 +220,7 @@ export function App() {
           collapsed={sidebarCollapsed}
           period={currentPeriod}
           onNavigate={(r) => {
-            if (r === 'home') setRoute({ name: 'home' });
+            if (r === 'home' || r === 'preview' || r === 'mapping') setRoute({ name: 'home' });
             if (r === 'setup') setRoute({ name: 'setup', fromSettings: true });
             if (r === 'history') {
               api().log.list().then((logs) => setRoute({ name: 'history', logs })).catch(console.error);
