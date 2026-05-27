@@ -62,6 +62,8 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   );
   const [search, setSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const ROW_PAGE = 500;
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE);
   const [filters, setFilters] = useState<Filters>({
     status: 'all', dept: 'all', empType: 'all', hideErrors: false,
   });
@@ -128,6 +130,10 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     const id = setTimeout(() => setPreviewShown(null), 6000);
     return () => clearTimeout(id);
   }, [previewShown]);
+
+  useEffect(() => {
+    setVisibleCount(ROW_PAGE);
+  }, [search, filters]);
 
   const deptList = useMemo(() => {
     const set = new Set<string>();
@@ -439,7 +445,10 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
         {activeFilterCount > 0 && (
           <div className="flex items-center flex-wrap gap-1.5 mb-3">
             {filters.status !== 'all' && (
-              <FilterChip label={`Trạng thái: ${filters.status}`} onRemove={() => setFilters((f) => ({ ...f, status: 'all' }))} />
+              <FilterChip
+                label={`Trạng thái: ${{ 'unsent': 'Chưa gửi', 'sent-unread': 'Đã gửi (chưa mở)', 'sent-opened': 'Đã mở' }[filters.status]}`}
+                onRemove={() => setFilters((f) => ({ ...f, status: 'all' }))}
+              />
             )}
             {filters.dept !== 'all' && (
               <FilterChip label={`Phòng ban: ${filters.dept}`} onRemove={() => setFilters((f) => ({ ...f, dept: 'all' }))} />
@@ -488,12 +497,12 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
           </div>
 
           <div>
-            {displayRows.map((e, idx) => {
+            {displayRows.slice(0, visibleCount).map((e, idx) => {
               const isInvalid = e.errors.length > 0;
               const isSelected = selected.has(e.rowIndex);
               const prior = priorByMaNV[e.maNV];
               const openInfo = prior?.trackToken ? opensByToken[prior.trackToken] : undefined;
-              const isLast = idx === displayRows.length - 1;
+              const isLast = idx === Math.min(visibleCount, displayRows.length) - 1;
               return (
                 <div
                   key={e.rowIndex}
@@ -544,6 +553,19 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
                 </div>
               );
             })}
+
+            {displayRows.length > visibleCount && (
+              <div className="px-4 py-4 text-center" style={{ borderTop: '1px solid #EEF0F3' }}>
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((c) => c + ROW_PAGE)}
+                  className="text-xs text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg px-3 py-1.5 bg-white hover:bg-slate-50 transition-colors"
+                >
+                  Hiển thị thêm {Math.min(ROW_PAGE, displayRows.length - visibleCount)} dòng
+                  <span className="text-slate-400 ml-1">(còn {displayRows.length - visibleCount})</span>
+                </button>
+              </div>
+            )}
 
             {displayRows.length === 0 && (
               <div className="py-10 text-center text-sm text-slate-400">
@@ -640,20 +662,13 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
   );
 }
 
-function FilterPopover({
-  filters,
-  deptList,
-  onChange,
-  onClose,
-}: {
-  filters: Filters;
-  deptList: string[];
-  onChange: (f: Filters) => void;
-  onClose: () => void;
+function ChipOpt({ value, current, label, onSelect }: {
+  value: string;
+  current: string;
+  label: string;
+  onSelect: () => void;
 }) {
-  const [local, setLocal] = useState<Filters>(filters);
-
-  const ChipOpt = ({ value, current, label, onSelect }: { value: string; current: string; label: string; onSelect: () => void }) => (
+  return (
     <button
       type="button"
       onClick={onSelect}
@@ -669,6 +684,21 @@ function FilterPopover({
       {label}
     </button>
   );
+}
+
+function FilterPopover({
+  filters,
+  deptList,
+  onChange,
+  onClose,
+}: {
+  filters: Filters;
+  deptList: string[];
+  onChange: (f: Filters) => void;
+  onClose: () => void;
+}) {
+  const [local, setLocal] = useState<Filters>(filters);
+  useEffect(() => { setLocal(filters); }, [filters]);
 
   return (
     <div
