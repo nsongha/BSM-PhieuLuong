@@ -61,7 +61,7 @@ export function Sidebar({ activeRoute, onNavigate, collapsed = false, period, on
       <nav className="flex-1 flex flex-col gap-0.5 px-2">
         {NAV_ITEMS.map((item) => {
           const isActive = activeRoute === item.routeName ||
-            (item.routeName === 'preview' && ['preview', 'mapping', 'period-pick', 'sheet-pick'].includes(activeRoute));
+            (item.routeName === 'preview' && ['preview', 'period-pick', 'sheet-pick'].includes(activeRoute));
           return (
             <button
               key={item.routeName}
