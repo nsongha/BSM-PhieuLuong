@@ -11,6 +11,7 @@ import { PreviewScreen } from './screens/PreviewScreen';
 import { SendProgressScreen } from './screens/SendProgressScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { PeriodPickerScreen } from './screens/PeriodPickerScreen';
+import { Sidebar } from './components/Sidebar';
 
 type Route =
   | { name: 'loading' }
@@ -62,6 +63,19 @@ export function App() {
   const [checkpoint, setCheckpoint] = useState<Checkpoint | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const online = useOnline();
+  const [sidebarCollapsed, _setSidebarCollapsed] = useState(false);
+  const sidebarActive = (() => {
+    if (route.name === 'preview' || route.name === 'period-pick' || route.name === 'sheet-pick') return 'preview';
+    if (route.name === 'mapping') return 'mapping';
+    if (route.name === 'history') return 'history';
+    if (route.name === 'setup') return 'setup';
+    return 'home';
+  })();
+  const currentPeriod = (() => {
+    if (route.name === 'preview') return { month: sendOpts.month, year: sendOpts.year };
+    if (route.name === 'sending') return { month: route.opts.month, year: route.opts.year };
+    return undefined;
+  })();
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +182,8 @@ export function App() {
     }
   };
 
+  const showSidebar = route.name !== 'loading' && route.name !== 'setup';
+
   if (route.name === 'loading') {
     if (bootError) {
       return (
@@ -197,175 +213,201 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen">
-      {!online && (
-        <div className="bg-red-100 text-red-900 px-4 py-2 text-sm font-medium border-b border-red-300 flex items-center gap-2 justify-center">
-          <WifiOff size={16} />
-          Mất kết nối Internet — không thể gửi email hay truy vấn tracker
-        </div>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#F7F8FA' }}>
+      {showSidebar && (
+        <Sidebar
+          activeRoute={sidebarActive}
+          collapsed={sidebarCollapsed}
+          period={currentPeriod}
+          onNavigate={(r) => {
+            if (r === 'home') setRoute({ name: 'home' });
+            if (r === 'setup') setRoute({ name: 'setup', fromSettings: true });
+            if (r === 'history') {
+              api().log.list().then((logs) => setRoute({ name: 'history', logs })).catch(console.error);
+            }
+          }}
+          onChangePeriod={() => setRoute({ name: 'home' })}
+        />
       )}
-      {qpdfStatus && !qpdfStatus.ok && !simulate && (
-        <div className="bg-red-50 text-red-800 px-4 py-2 text-sm border-b border-red-200 flex items-center gap-2 justify-center">
-          <AlertTriangle size={16} />
-          {qpdfStatus.message}
-        </div>
-      )}
-      {simulate && (
-        <div className="bg-purple-100 text-purple-900 px-4 py-2 text-sm font-medium text-center border-b border-purple-200 flex items-center gap-2 justify-center">
-          <Drama size={16} />
-          Chế độ Giả lập — không gửi email thật
-        </div>
-      )}
-      {testMode && !simulate && (
-        <div className="bg-amber-100 text-amber-900 px-4 py-2 text-sm font-medium text-center border-b border-amber-200 flex items-center gap-2 justify-center">
-          <FlaskConical size={16} />
-          Chế độ Test — mọi email sẽ gửi đến địa chỉ test
-        </div>
-      )}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Banners */}
+        {!online && (
+          <div className="bg-red-100 text-red-900 px-4 py-2 text-sm font-medium border-b border-red-300 flex items-center gap-2 justify-center">
+            <WifiOff size={16} />
+            Mất kết nối Internet — không thể gửi email hay truy vấn tracker
+          </div>
+        )}
+        {qpdfStatus && !qpdfStatus.ok && !simulate && (
+          <div className="bg-red-50 text-red-800 px-4 py-2 text-sm border-b border-red-200 flex items-center gap-2 justify-center">
+            <AlertTriangle size={16} />
+            {qpdfStatus.message}
+          </div>
+        )}
+        {simulate && (
+          <div className="bg-purple-100 text-purple-900 px-4 py-2 text-sm font-medium text-center border-b border-purple-200 flex items-center gap-2 justify-center">
+            <Drama size={16} />
+            Chế độ Giả lập — không gửi email thật
+          </div>
+        )}
+        {testMode && !simulate && (
+          <div className="bg-amber-100 text-amber-900 px-4 py-2 text-sm font-medium text-center border-b border-amber-200 flex items-center gap-2 justify-center">
+            <FlaskConical size={16} />
+            Chế độ Test — mọi email sẽ gửi đến địa chỉ test
+          </div>
+        )}
 
-      <div className="max-w-5xl mx-auto p-6">
+        {/* Setup — full screen, no max-width */}
         {route.name === 'setup' && (
-          <SetupScreen
-            initial={settings}
-            hasPassword={hasPassword}
-            hasTrackerSecret={hasTrackerSecret}
-            onBack={route.fromSettings ? () => setRoute({ name: 'home' }) : undefined}
-            onSaved={async (s, passwordChanged) => {
-              setSettings(s);
-              if (passwordChanged) setHasPassword(true);
-              const { hasTrackerSecret: hts } = await api().settings.get();
-              setHasTrackerSecret(hts);
-              setRoute({ name: 'home' });
-            }}
-          />
-        )}
-
-        {route.name === 'home' && settings && (
-          <>
-            {checkpoint && (
-              <ResumeBanner
-                checkpoint={checkpoint}
-                onResume={() => {
-                  setRoute({
-                    name: 'sending',
-                    employees: checkpoint.employees,
-                    opts: checkpoint.opts,
-                  });
-                  setCheckpoint(null);
-                }}
-                onDiscard={async () => {
-                  await api().checkpoint.discard();
-                  setCheckpoint(null);
-                }}
-              />
-            )}
-            <HomeScreen
-              settings={settings}
-              testMode={testMode}
-              onToggleTestMode={setTestMode}
-              simulate={simulate}
-              onToggleSimulate={setSimulate}
-              onStartNew={async () => {
-                const filePath = await api().openFile();
-                if (!filePath) return;
-                await loadAndRoute(filePath);
+          <div className="flex-1 overflow-y-auto">
+            <SetupScreen
+              initial={settings}
+              hasPassword={hasPassword}
+              hasTrackerSecret={hasTrackerSecret}
+              onBack={route.fromSettings ? () => setRoute({ name: 'home' }) : undefined}
+              onSaved={async (s, passwordChanged) => {
+                setSettings(s);
+                if (passwordChanged) setHasPassword(true);
+                const { hasTrackerSecret: hts } = await api().settings.get();
+                setHasTrackerSecret(hts);
+                setRoute({ name: 'home' });
               }}
-              onFileDropped={async (filePath) => {
-                await loadAndRoute(filePath);
-              }}
-              onOpenHistory={async () => {
-                const logs = await api().log.list();
-                setRoute({ name: 'history', logs });
-              }}
-              onOpenSettings={() => setRoute({ name: 'setup', fromSettings: true })}
             />
-          </>
+          </div>
         )}
 
-        {route.name === 'sheet-pick' && (
-          <SheetPickerScreen
-            filePath={route.filePath}
-            sheets={route.sheets}
-            onBack={() => setRoute({ name: 'home' })}
-            onPick={(sheetIndex) => loadAndRoute(route.filePath, sheetIndex)}
-          />
-        )}
+        {/* Main scrollable content */}
+        {route.name !== 'setup' && (
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-5xl mx-auto p-6">
+              {route.name === 'home' && settings && (
+                <>
+                  {checkpoint && (
+                    <ResumeBanner
+                      checkpoint={checkpoint}
+                      onResume={() => {
+                        setRoute({
+                          name: 'sending',
+                          employees: checkpoint.employees,
+                          opts: checkpoint.opts,
+                        });
+                        setCheckpoint(null);
+                      }}
+                      onDiscard={async () => {
+                        await api().checkpoint.discard();
+                        setCheckpoint(null);
+                      }}
+                    />
+                  )}
+                  <HomeScreen
+                    settings={settings}
+                    testMode={testMode}
+                    onToggleTestMode={setTestMode}
+                    simulate={simulate}
+                    onToggleSimulate={setSimulate}
+                    onStartNew={async () => {
+                      const filePath = await api().openFile();
+                      if (!filePath) return;
+                      await loadAndRoute(filePath);
+                    }}
+                    onFileDropped={async (filePath) => {
+                      await loadAndRoute(filePath);
+                    }}
+                    onOpenHistory={async () => {
+                      const logs = await api().log.list();
+                      setRoute({ name: 'history', logs });
+                    }}
+                    onOpenSettings={() => setRoute({ name: 'setup', fromSettings: true })}
+                  />
+                </>
+              )}
 
-        {route.name === 'period-pick' && (
-          <PeriodPickerScreen
-            periods={route.periods}
-            missingCount={route.missingCount}
-            onBack={() => setRoute({ name: 'home' })}
-            onPick={async (key) => {
-              const p = route.periods.find((x) => x.key === key);
-              if (!p) return;
-              updateSendOpts({ month: p.month, year: p.year });
-              await routeAfterLoad(
-                route.filePath,
-                route.headers,
-                route.rows,
-                route.periodCol,
-                key
-              );
-            }}
-          />
-        )}
+              {route.name === 'sheet-pick' && (
+                <SheetPickerScreen
+                  filePath={route.filePath}
+                  sheets={route.sheets}
+                  onBack={() => setRoute({ name: 'home' })}
+                  onPick={(sheetIndex) => loadAndRoute(route.filePath, sheetIndex)}
+                />
+              )}
 
-        {route.name === 'mapping' && (
-          <MappingScreen
-            headers={route.headers}
-            rows={route.rows}
-            initialMapping={route.initialMapping}
-            onBack={() => setRoute({ name: 'home' })}
-            onComplete={(mapping, employees) =>
-              setRoute({
-                name: 'preview',
-                filePath: route.filePath,
-                headers: route.headers,
-                rows: route.rows,
-                mapping,
-                employees,
-              })
-            }
-          />
-        )}
+              {route.name === 'period-pick' && (
+                <PeriodPickerScreen
+                  periods={route.periods}
+                  missingCount={route.missingCount}
+                  onBack={() => setRoute({ name: 'home' })}
+                  onPick={async (key) => {
+                    const p = route.periods.find((x) => x.key === key);
+                    if (!p) return;
+                    updateSendOpts({ month: p.month, year: p.year });
+                    await routeAfterLoad(
+                      route.filePath,
+                      route.headers,
+                      route.rows,
+                      route.periodCol,
+                      key
+                    );
+                  }}
+                />
+              )}
 
-        {route.name === 'preview' && settings && (
-          <PreviewScreen
-            employees={route.employees}
-            settings={settings}
-            opts={{ ...sendOpts, testMode, simulate }}
-            onBack={() => setRoute({ name: 'home' })}
-            onSendReal={(selected) =>
-              setRoute({
-                name: 'sending',
-                employees: selected,
-                opts: { ...sendOpts, testMode, simulate },
-              })
-            }
-          />
-        )}
+              {route.name === 'mapping' && (
+                <MappingScreen
+                  headers={route.headers}
+                  rows={route.rows}
+                  initialMapping={route.initialMapping}
+                  onBack={() => setRoute({ name: 'home' })}
+                  onComplete={(mapping, employees) =>
+                    setRoute({
+                      name: 'preview',
+                      filePath: route.filePath,
+                      headers: route.headers,
+                      rows: route.rows,
+                      mapping,
+                      employees,
+                    })
+                  }
+                />
+              )}
 
-        {route.name === 'sending' && settings && (
-          <SendProgressScreen
-            key={route.employees.map((e) => e.rowIndex).join(',')}
-            employees={route.employees}
-            settings={settings}
-            opts={route.opts}
-            onDone={() => setRoute({ name: 'home' })}
-            onCancel={() => setRoute({ name: 'home' })}
-            onResendFailed={(failed) =>
-              setRoute({ name: 'sending', employees: failed, opts: route.opts })
-            }
-          />
-        )}
+              {route.name === 'preview' && settings && (
+                <PreviewScreen
+                  employees={route.employees}
+                  settings={settings}
+                  opts={{ ...sendOpts, testMode, simulate }}
+                  onBack={() => setRoute({ name: 'home' })}
+                  onSendReal={(selected) =>
+                    setRoute({
+                      name: 'sending',
+                      employees: selected,
+                      opts: { ...sendOpts, testMode, simulate },
+                    })
+                  }
+                />
+              )}
 
-        {route.name === 'history' && settings && (
-          <HistoryScreen
-            logs={route.logs}
-            settings={settings}
-            onBack={() => setRoute({ name: 'home' })}
-          />
+              {route.name === 'sending' && settings && (
+                <SendProgressScreen
+                  key={route.employees.map((e) => e.rowIndex).join(',')}
+                  employees={route.employees}
+                  settings={settings}
+                  opts={route.opts}
+                  onDone={() => setRoute({ name: 'home' })}
+                  onCancel={() => setRoute({ name: 'home' })}
+                  onResendFailed={(failed) =>
+                    setRoute({ name: 'sending', employees: failed, opts: route.opts })
+                  }
+                />
+              )}
+
+              {route.name === 'history' && settings && (
+                <HistoryScreen
+                  logs={route.logs}
+                  settings={settings}
+                  onBack={() => setRoute({ name: 'home' })}
+                />
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
