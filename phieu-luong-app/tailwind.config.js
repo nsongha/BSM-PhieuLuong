@@ -7,12 +7,12 @@ export default {
         sans: ['Inter', 'Roboto', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
       },
       fontSize: {
-        base: ['18px', '1.6'],
-        lg: ['20px', '1.55'],
-        xl: ['22px', '1.5'],
-        '2xl': ['26px', '1.4'],
-        '3xl': ['32px', '1.3'],
-        '4xl': ['40px', '1.2'],
+        base: ['15px', '1.6'],
+        lg: ['17px', '1.55'],
+        xl: ['19px', '1.5'],
+        '2xl': ['22px', '1.4'],
+        '3xl': ['27px', '1.3'],
+        '4xl': ['34px', '1.2'],
       },
       colors: {
         brand: {
