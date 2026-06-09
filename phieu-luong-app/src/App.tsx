@@ -11,6 +11,42 @@ import { PreviewScreen } from './screens/PreviewScreen';
 import { SendProgressScreen } from './screens/SendProgressScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { PeriodPickerScreen } from './screens/PeriodPickerScreen';
+import { Sidebar, type SavedPeriod } from './components/Sidebar';
+
+const LS_SAVED_PREVIEWS = 'phieu-luong:saved-previews';
+const LS_SIDEBAR_COLLAPSED = 'phieu-luong:sidebar-collapsed';
+const MAX_SAVED_PREVIEWS = 12;
+
+type SavedPreviewSnapshot = {
+  key: string;
+  month: string;
+  year: string;
+  filePath: string;
+  employees: Employee[];
+  savedAt: string;
+};
+
+function loadSavedPreviews(): SavedPreviewSnapshot[] {
+  try {
+    const raw = localStorage.getItem(LS_SAVED_PREVIEWS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((p): p is SavedPreviewSnapshot =>
+      p && typeof p.key === 'string' && Array.isArray(p.employees)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedPreviews(list: SavedPreviewSnapshot[]) {
+  try {
+    localStorage.setItem(LS_SAVED_PREVIEWS, JSON.stringify(list));
+  } catch (err) {
+    console.warn('[persist] failed to save previews:', err);
+  }
+}
 
 type Route =
   | { name: 'loading' }
@@ -62,6 +98,55 @@ export function App() {
   const [checkpoint, setCheckpoint] = useState<Checkpoint | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const online = useOnline();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [savedPreviews, setSavedPreviews] = useState<SavedPreviewSnapshot[]>(() => loadSavedPreviews());
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(LS_SIDEBAR_COLLAPSED, next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const sidebarActive: 'home' | 'preview' | 'history' | 'setup' = (() => {
+    if (route.name === 'preview' || route.name === 'period-pick' || route.name === 'sheet-pick' || route.name === 'sending' || route.name === 'mapping') return 'preview';
+    if (route.name === 'history') return 'history';
+    if (route.name === 'setup') return 'setup';
+    return 'home';
+  })();
+
+  const activePeriodKey: string | null =
+    route.name === 'preview' || route.name === 'sending'
+      ? `${route.name === 'sending' ? route.opts.year : sendOpts.year}-${route.name === 'sending' ? route.opts.month : sendOpts.month}`
+      : null;
+
+  // Newest-imported on top — sort by savedAt desc, not by period key.
+  const sidebarSavedPeriods: SavedPeriod[] = savedPreviews
+    .slice()
+    .sort((a, b) => (a.savedAt < b.savedAt ? 1 : a.savedAt > b.savedAt ? -1 : 0))
+    .map((p) => ({ key: p.key, month: p.month, year: p.year, savedAt: p.savedAt }));
+
+  const deleteSavedPreview = (key: string) => {
+    setSavedPreviews((prev) => {
+      const next = prev.filter((p) => p.key !== key);
+      persistSavedPreviews(next);
+      return next;
+    });
+    // If user just deleted the period they're currently viewing, drop back to Import.
+    if (
+      (route.name === 'preview' && `${sendOpts.year}-${sendOpts.month}` === key) ||
+      (route.name === 'sending' && `${route.opts.year}-${route.opts.month}` === key)
+    ) {
+      setRoute({ name: 'home' });
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +184,66 @@ export function App() {
 
   const updateSendOpts = (u: Partial<SendOptions>) =>
     setSendOpts((prev) => ({ ...prev, ...u }));
+
+  // Auto-save current preview snapshot when entering the preview route.
+  useEffect(() => {
+    if (route.name !== 'preview') return;
+    const key = `${sendOpts.year}-${sendOpts.month}`;
+    const snapshot: SavedPreviewSnapshot = {
+      key,
+      month: sendOpts.month,
+      year: sendOpts.year,
+      filePath: route.filePath,
+      employees: route.employees,
+      savedAt: new Date().toISOString(),
+    };
+    setSavedPreviews((prev) => {
+      const filtered = prev.filter((p) => p.key !== key);
+      const next = [snapshot, ...filtered].slice(0, MAX_SAVED_PREVIEWS);
+      persistSavedPreviews(next);
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, sendOpts.year, sendOpts.month]);
+
+  const restoreSavedPreview = (key: string) => {
+    const snap = savedPreviews.find((p) => p.key === key);
+    if (!snap || !settings) return;
+    updateSendOpts({ month: snap.month, year: snap.year });
+    setRoute({
+      name: 'preview',
+      filePath: snap.filePath,
+      headers: [],
+      rows: [],
+      mapping: {} as Mapping,
+      employees: snap.employees,
+    });
+  };
+
+  const handleSidebarNavigate = (target: 'home' | 'preview' | 'history' | 'setup') => {
+    if (target === 'home') {
+      setRoute({ name: 'home' });
+      return;
+    }
+    if (target === 'preview') {
+      // If we're already inside the preview flow (or sending), do nothing.
+      if (['preview', 'period-pick', 'sheet-pick', 'sending', 'mapping'].includes(route.name)) return;
+      // Otherwise: restore most-recent saved preview, or go to Import if none.
+      if (sidebarSavedPeriods.length > 0) {
+        restoreSavedPreview(sidebarSavedPeriods[0].key);
+      } else {
+        setRoute({ name: 'home' });
+      }
+      return;
+    }
+    if (target === 'setup') {
+      setRoute({ name: 'setup', fromSettings: true });
+      return;
+    }
+    if (target === 'history') {
+      api().log.list().then((logs) => setRoute({ name: 'history', logs })).catch(console.error);
+    }
+  };
 
   const loadAndRoute = async (filePath: string, sheetIndex?: number) => {
     try {
@@ -168,6 +313,8 @@ export function App() {
     }
   };
 
+  const showSidebar = route.name !== 'loading';
+
   if (route.name === 'loading') {
     if (bootError) {
       return (
@@ -197,175 +344,203 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen">
-      {!online && (
-        <div className="bg-red-100 text-red-900 px-4 py-2 text-sm font-medium border-b border-red-300 flex items-center gap-2 justify-center">
-          <WifiOff size={16} />
-          Mất kết nối Internet — không thể gửi email hay truy vấn tracker
-        </div>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#F7F8FA' }}>
+      {showSidebar && (
+        <Sidebar
+          activeRoute={sidebarActive}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={toggleSidebar}
+          savedPeriods={sidebarSavedPeriods}
+          activePeriodKey={activePeriodKey}
+          onSelectPeriod={restoreSavedPreview}
+          onDeletePeriod={deleteSavedPreview}
+          onNavigate={handleSidebarNavigate}
+        />
       )}
-      {qpdfStatus && !qpdfStatus.ok && !simulate && (
-        <div className="bg-red-50 text-red-800 px-4 py-2 text-sm border-b border-red-200 flex items-center gap-2 justify-center">
-          <AlertTriangle size={16} />
-          {qpdfStatus.message}
-        </div>
-      )}
-      {simulate && (
-        <div className="bg-purple-100 text-purple-900 px-4 py-2 text-sm font-medium text-center border-b border-purple-200 flex items-center gap-2 justify-center">
-          <Drama size={16} />
-          Chế độ Giả lập — không gửi email thật
-        </div>
-      )}
-      {testMode && !simulate && (
-        <div className="bg-amber-100 text-amber-900 px-4 py-2 text-sm font-medium text-center border-b border-amber-200 flex items-center gap-2 justify-center">
-          <FlaskConical size={16} />
-          Chế độ Test — mọi email sẽ gửi đến địa chỉ test
-        </div>
-      )}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Banners */}
+        {!online && (
+          <div className="bg-red-100 text-red-900 px-4 py-2 text-sm font-medium border-b border-red-300 flex items-center gap-2 justify-center">
+            <WifiOff size={16} />
+            Mất kết nối Internet — không thể gửi email hay truy vấn tracker
+          </div>
+        )}
+        {qpdfStatus && !qpdfStatus.ok && !simulate && (
+          <div className="bg-red-50 text-red-800 px-4 py-2 text-sm border-b border-red-200 flex items-center gap-2 justify-center">
+            <AlertTriangle size={16} />
+            {qpdfStatus.message}
+          </div>
+        )}
+        {simulate && (
+          <div className="bg-purple-100 text-purple-900 px-4 py-2 text-sm font-medium text-center border-b border-purple-200 flex items-center gap-2 justify-center">
+            <Drama size={16} />
+            Chế độ Giả lập — không gửi email thật
+          </div>
+        )}
+        {testMode && !simulate && (
+          <div className="bg-amber-100 text-amber-900 px-4 py-2 text-sm font-medium text-center border-b border-amber-200 flex items-center gap-2 justify-center">
+            <FlaskConical size={16} />
+            Chế độ Test — mọi email sẽ gửi đến địa chỉ test
+          </div>
+        )}
 
-      <div className="max-w-5xl mx-auto p-6">
+        {/* Setup — full bleed, screen manages its own padding + sticky footer */}
         {route.name === 'setup' && (
-          <SetupScreen
-            initial={settings}
-            hasPassword={hasPassword}
-            hasTrackerSecret={hasTrackerSecret}
-            onBack={route.fromSettings ? () => setRoute({ name: 'home' }) : undefined}
-            onSaved={async (s, passwordChanged) => {
-              setSettings(s);
-              if (passwordChanged) setHasPassword(true);
-              const { hasTrackerSecret: hts } = await api().settings.get();
-              setHasTrackerSecret(hts);
-              setRoute({ name: 'home' });
-            }}
-          />
-        )}
-
-        {route.name === 'home' && settings && (
-          <>
-            {checkpoint && (
-              <ResumeBanner
-                checkpoint={checkpoint}
-                onResume={() => {
-                  setRoute({
-                    name: 'sending',
-                    employees: checkpoint.employees,
-                    opts: checkpoint.opts,
-                  });
-                  setCheckpoint(null);
-                }}
-                onDiscard={async () => {
-                  await api().checkpoint.discard();
-                  setCheckpoint(null);
-                }}
-              />
-            )}
-            <HomeScreen
-              settings={settings}
-              testMode={testMode}
-              onToggleTestMode={setTestMode}
-              simulate={simulate}
-              onToggleSimulate={setSimulate}
-              onStartNew={async () => {
-                const filePath = await api().openFile();
-                if (!filePath) return;
-                await loadAndRoute(filePath);
+          <div className="flex-1 overflow-y-auto">
+            <SetupScreen
+              initial={settings}
+              hasPassword={hasPassword}
+              hasTrackerSecret={hasTrackerSecret}
+              onBack={route.fromSettings ? () => setRoute({ name: 'home' }) : undefined}
+              onSaved={async (s, passwordChanged) => {
+                setSettings(s);
+                if (passwordChanged) setHasPassword(true);
+                const { hasTrackerSecret: hts } = await api().settings.get();
+                setHasTrackerSecret(hts);
+                setRoute({ name: 'home' });
               }}
-              onFileDropped={async (filePath) => {
-                await loadAndRoute(filePath);
-              }}
-              onOpenHistory={async () => {
-                const logs = await api().log.list();
-                setRoute({ name: 'history', logs });
-              }}
-              onOpenSettings={() => setRoute({ name: 'setup', fromSettings: true })}
             />
-          </>
+          </div>
         )}
 
-        {route.name === 'sheet-pick' && (
-          <SheetPickerScreen
-            filePath={route.filePath}
-            sheets={route.sheets}
-            onBack={() => setRoute({ name: 'home' })}
-            onPick={(sheetIndex) => loadAndRoute(route.filePath, sheetIndex)}
-          />
-        )}
-
-        {route.name === 'period-pick' && (
-          <PeriodPickerScreen
-            periods={route.periods}
-            missingCount={route.missingCount}
-            onBack={() => setRoute({ name: 'home' })}
-            onPick={async (key) => {
-              const p = route.periods.find((x) => x.key === key);
-              if (!p) return;
-              updateSendOpts({ month: p.month, year: p.year });
-              await routeAfterLoad(
-                route.filePath,
-                route.headers,
-                route.rows,
-                route.periodCol,
-                key
-              );
-            }}
-          />
-        )}
-
-        {route.name === 'mapping' && (
-          <MappingScreen
-            headers={route.headers}
-            rows={route.rows}
-            initialMapping={route.initialMapping}
-            onBack={() => setRoute({ name: 'home' })}
-            onComplete={(mapping, employees) =>
-              setRoute({
-                name: 'preview',
-                filePath: route.filePath,
-                headers: route.headers,
-                rows: route.rows,
-                mapping,
-                employees,
-              })
-            }
-          />
-        )}
-
+        {/* Preview — full bleed, screen manages its own header + sticky footer.
+            Outer wrapper is overflow-hidden flex column so PreviewScreen's
+            internal 3-zone (header/main scroll/footer) fills the viewport. */}
         {route.name === 'preview' && settings && (
-          <PreviewScreen
-            employees={route.employees}
-            settings={settings}
-            opts={{ ...sendOpts, testMode, simulate }}
-            onBack={() => setRoute({ name: 'home' })}
-            onSendReal={(selected) =>
-              setRoute({
-                name: 'sending',
-                employees: selected,
-                opts: { ...sendOpts, testMode, simulate },
-              })
-            }
-          />
+          <div className="flex-1 min-h-0 flex flex-col">
+            <PreviewScreen
+              employees={route.employees}
+              settings={settings}
+              opts={{ ...sendOpts, testMode, simulate }}
+              onBack={() => setRoute({ name: 'home' })}
+              onSendReal={(selected) =>
+                setRoute({
+                  name: 'sending',
+                  employees: selected,
+                  opts: { ...sendOpts, testMode, simulate },
+                })
+              }
+            />
+          </div>
         )}
 
-        {route.name === 'sending' && settings && (
-          <SendProgressScreen
-            key={route.employees.map((e) => e.rowIndex).join(',')}
-            employees={route.employees}
-            settings={settings}
-            opts={route.opts}
-            onDone={() => setRoute({ name: 'home' })}
-            onCancel={() => setRoute({ name: 'home' })}
-            onResendFailed={(failed) =>
-              setRoute({ name: 'sending', employees: failed, opts: route.opts })
-            }
-          />
-        )}
+        {/* Main scrollable content (constrained) */}
+        {route.name !== 'setup' && route.name !== 'preview' && (
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-5xl mx-auto p-6">
+              {route.name === 'home' && settings && (
+                <>
+                  {checkpoint && (
+                    <ResumeBanner
+                      checkpoint={checkpoint}
+                      onResume={() => {
+                        setRoute({
+                          name: 'sending',
+                          employees: checkpoint.employees,
+                          opts: checkpoint.opts,
+                        });
+                        setCheckpoint(null);
+                      }}
+                      onDiscard={async () => {
+                        await api().checkpoint.discard();
+                        setCheckpoint(null);
+                      }}
+                    />
+                  )}
+                  <HomeScreen
+                    settings={settings}
+                    testMode={testMode}
+                    onToggleTestMode={setTestMode}
+                    simulate={simulate}
+                    onToggleSimulate={setSimulate}
+                    onStartNew={async () => {
+                      const filePath = await api().openFile();
+                      if (!filePath) return;
+                      await loadAndRoute(filePath);
+                    }}
+                    onFileDropped={async (filePath) => {
+                      await loadAndRoute(filePath);
+                    }}
+                    onOpenHistory={async () => {
+                      const logs = await api().log.list();
+                      setRoute({ name: 'history', logs });
+                    }}
+                    onOpenSettings={() => setRoute({ name: 'setup', fromSettings: true })}
+                  />
+                </>
+              )}
 
-        {route.name === 'history' && settings && (
-          <HistoryScreen
-            logs={route.logs}
-            settings={settings}
-            onBack={() => setRoute({ name: 'home' })}
-          />
+              {route.name === 'sheet-pick' && (
+                <SheetPickerScreen
+                  filePath={route.filePath}
+                  sheets={route.sheets}
+                  onBack={() => setRoute({ name: 'home' })}
+                  onPick={(sheetIndex) => loadAndRoute(route.filePath, sheetIndex)}
+                />
+              )}
+
+              {route.name === 'period-pick' && (
+                <PeriodPickerScreen
+                  periods={route.periods}
+                  missingCount={route.missingCount}
+                  onBack={() => setRoute({ name: 'home' })}
+                  onPick={async (key) => {
+                    const p = route.periods.find((x) => x.key === key);
+                    if (!p) return;
+                    updateSendOpts({ month: p.month, year: p.year });
+                    await routeAfterLoad(
+                      route.filePath,
+                      route.headers,
+                      route.rows,
+                      route.periodCol,
+                      key
+                    );
+                  }}
+                />
+              )}
+
+              {route.name === 'mapping' && (
+                <MappingScreen
+                  headers={route.headers}
+                  rows={route.rows}
+                  initialMapping={route.initialMapping}
+                  onBack={() => setRoute({ name: 'home' })}
+                  onComplete={(mapping, employees) =>
+                    setRoute({
+                      name: 'preview',
+                      filePath: route.filePath,
+                      headers: route.headers,
+                      rows: route.rows,
+                      mapping,
+                      employees,
+                    })
+                  }
+                />
+              )}
+
+              {route.name === 'sending' && settings && (
+                <SendProgressScreen
+                  key={route.employees.map((e) => e.rowIndex).join(',')}
+                  employees={route.employees}
+                  settings={settings}
+                  opts={route.opts}
+                  onDone={() => setRoute({ name: 'home' })}
+                  onCancel={() => setRoute({ name: 'home' })}
+                  onResendFailed={(failed) =>
+                    setRoute({ name: 'sending', employees: failed, opts: route.opts })
+                  }
+                />
+              )}
+
+              {route.name === 'history' && settings && (
+                <HistoryScreen
+                  logs={route.logs}
+                  settings={settings}
+                  onBack={() => setRoute({ name: 'home' })}
+                />
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

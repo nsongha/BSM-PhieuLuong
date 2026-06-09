@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', sans-serif;
-  font-size: 18px;
+  font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', sans-serif;
+  font-size: 15px;
   color-scheme: light;
 }
 
@@ -24,19 +24,16 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-cta-500 px-6 py-4 text-lg font-medium text-white transition-colors duration-200 hover:bg-cta-600 disabled:cursor-not-allowed disabled:opacity-50;
-    min-height: 56px;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-cta-500 px-5 py-3 text-lg font-medium text-white transition-colors duration-200 hover:bg-cta-600 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-300 px-5 py-3 text-base font-medium text-slate-800 transition-colors duration-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50;
-    min-height: 48px;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-300 px-4 py-2.5 text-base font-medium text-slate-800 transition-colors duration-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-ghost {
     @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-base text-slate-700 hover:bg-slate-100 disabled:opacity-50;
   }
   .input {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
-    min-height: 56px;
+    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
   }
   .card {
     @apply rounded-2xl bg-white border border-slate-200;
@@ -67,6 +64,24 @@ body {
   }
 }
 
+/* Destructive confirm prompt — brief shake intro then a steady pulse so
+   "Xoá?" feels alarming without becoming annoying. */
+@keyframes pulse-confirm {
+  0%   { transform: scale(1)    translateX(0);    opacity: 1;    }
+  8%   { transform: scale(1.1)  translateX(-2px); opacity: 1;    }
+  16%  { transform: scale(1.1)  translateX(2px);  opacity: 1;    }
+  24%  { transform: scale(1.1)  translateX(-1px); opacity: 1;    }
+  32%  { transform: scale(1.08) translateX(1px);  opacity: 1;    }
+  50%  { transform: scale(1.04) translateX(0);    opacity: 0.85; }
+  100% { transform: scale(1)    translateX(0);    opacity: 1;    }
+}
+
+.animate-pulse-confirm {
+  animation: pulse-confirm 1.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Reveal characters one-by-one — used by MaskedAmount when unmasking. */
 @keyframes reveal-char {
   from {
     opacity: 0;

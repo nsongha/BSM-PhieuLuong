@@ -5,6 +5,26 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.0] - 2026-06-09
+
+### Changed (UI redesign — sidebar shell + orange brand)
+- **Layout mới**: app chuyển từ single-view sang **persistent sidebar shell** với orange brand (`#F97316`). Sidebar dark `#0F172A`, nav `Import · Bảng lương · Lịch sử` ở trên + `Cài đặt` pin xuống đáy.
+- **Sidebar compact**: hover cạnh phải sidebar → pull-tab nhỏ xuất hiện ở giữa → click thu/mở. Animation mượt (opacity + max-width fade các label).
+- **Saved periods**: mỗi lần import xong tự lưu kỳ vào sub-menu dưới "Bảng lương" (tối đa 12 kỳ, sort theo `savedAt` mới nhất). Click chip để xem lại không cần re-import. Hover xuất hiện nút `×` — click 2 lần (với pulse animation "Xoá?" đỏ) để xoá.
+- **PreviewScreen rewrite**: rename "Xem trước bảng lương" → "Duyệt thông tin phiếu lương", thêm sort theo cột (Họ tên / Email / Mã NV / Thực nhận / Trạng thái), bộ lọc popover (Trạng thái / Phòng ban / Loại HĐ / Ẩn lỗi) với chip selector + search bar.
+- **Layout 3-zone flex**: header và footer pin cứng (footer "Gửi N phiếu" luôn ở đáy viewport), chỉ vùng giữa scroll.
+- **History list**: cards → bảng compact (Kỳ · Thời gian · Chế độ · Tổng · Thành công · Thất bại), pagination 10/trang.
+- **Typography normalize**: base 15px (giảm từ 18px), font Inter — cân đối các màn cũ với redesign.
+
+### Removed
+- Bỏ mục **Mapping** khỏi sidebar (vẫn dùng được khi auto-detect mapping fail).
+- Bỏ trùng lặp: 2 banner "Chế độ Giả lập" + 2 nút "Gửi thử" trên PreviewScreen → giữ mỗi cái 1.
+
+### Kept
+- **Che số tiền lương** (v0.2.4) hoạt động trong PreviewScreen redesign: `MaskedAmount` tích hợp ở 3 chỗ (thẻ Tổng tiền, cột Thực nhận của row, Tổng ở footer).
+
+---
+
 ## [0.2.4] - 2026-06-09
 
 ### Added
