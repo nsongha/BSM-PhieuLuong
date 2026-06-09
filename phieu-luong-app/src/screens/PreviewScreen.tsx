@@ -17,6 +17,7 @@ import { useOnline } from '../lib/useOnline';
 import { Checkbox } from '../components/Checkbox';
 import { StatusPill } from '../components/StatusPill';
 import { SortHeader } from '../components/SortHeader';
+import { MaskedAmount } from '../components/MaskedAmount';
 
 type Props = {
   employees: Employee[];
@@ -42,10 +43,6 @@ type Filters = {
   empType: 'all' | 'full-time' | 'probation';
   hideErrors: boolean;
 };
-
-function formatVND(n: number) {
-  return n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
-}
 
 function statusRank(prior?: PriorSend, openInfo?: OpenStatus): number {
   if (!prior) return 1;
@@ -319,12 +316,12 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
 
       <div className="flex-1 min-h-0 overflow-y-auto px-8 py-5">
         <div className="grid grid-cols-4 gap-2.5 mb-3.5">
-          {[
+          {([
             { label: 'Hợp lệ', value: valid.length },
             { label: 'Có lỗi', value: invalid.length },
             { label: 'Đang chọn', value: `${selectedEmployees.length} / ${employees.length}` },
-            { label: 'Tổng tiền', value: formatVND(totalSelected) },
-          ].map(({ label, value }) => (
+            { label: 'Tổng tiền', value: <MaskedAmount value={totalSelected} /> },
+          ] as Array<{ label: string; value: React.ReactNode }>).map(({ label, value }) => (
             <div
               key={label}
               className="bg-white rounded-[10px] px-4 py-3.5"
@@ -524,7 +521,9 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
                   </div>
                   <div className="text-xs text-slate-500 truncate">{e.email}</div>
                   <div className="text-[11px] text-slate-500 font-mono tabular-nums">{e.maNV}</div>
-                  <div className="text-sm font-semibold tabular-nums text-slate-900 text-right">{formatVND(e.thucNhan)}</div>
+                  <div className="text-sm font-semibold tabular-nums text-slate-900 text-right">
+                    <MaskedAmount value={e.thucNhan} />
+                  </div>
                   <div>
                     <StatusPill isInvalid={isInvalid} prior={prior} openInfo={openInfo} />
                   </div>
@@ -573,7 +572,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
       >
         <div className="text-xs text-slate-400">
           Đã chọn <strong className="text-slate-900 font-semibold">{selectedEmployees.length} nhân viên</strong>
-          {' · '}Tổng <strong className="text-slate-900 font-semibold">{formatVND(totalSelected)}</strong>
+          {' · '}Tổng <strong className="text-slate-900 font-semibold"><MaskedAmount value={totalSelected} /></strong>
         </div>
         <div className="flex items-center gap-2">
           <button

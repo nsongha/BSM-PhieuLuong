@@ -81,6 +81,18 @@ body {
   transform-origin: center;
 }
 
+/* Reveal characters one-by-one — used by MaskedAmount when unmasking. */
+@keyframes reveal-char {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
