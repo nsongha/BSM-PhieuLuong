@@ -1,18 +1,33 @@
 #!/usr/bin/env node
 /**
- * Release script: bump version → build → tạo GitHub Release
- * Dùng: npm run release [patch|minor|major]
- * Mặc định: patch
+ * ⚠️  DEPRECATED — Đừng dùng script này từ v0.3.1 trở đi.
  *
- * Quản lý 2 file version song song:
- *   - package.json  → semver 3-digit (0.1.0)   dùng cho electron-updater
- *   - VERSION       → 4-digit     (0.1.0.0)     dùng cho gstack-ship
+ * Cách release đúng (xem `docs/developer-guide.md` §7):
+ *   1. Bump version trong package.json + VERSION + CHANGELOG, merge vào main qua PR.
+ *   2. `git checkout main && git pull --ff-only`
+ *   3. `git tag -a vX.Y.Z -m "..."`
+ *   4. `git push origin vX.Y.Z`
+ *   5. CI (`.github/workflows/build.yml`) tự build .dmg + .exe + tạo GitHub Release.
+ *
+ * Lý do deprecated:
+ *   - Tự bump version từ package.json hiện tại → nếu đã bump qua PR sẽ bump lần nữa
+ *   - `npm run build:win` trong script này FAIL trên Apple Silicon Mac (electron-builder
+ *     cần wine + Rosetta để chạy rcedit.exe; cached wine binary là Intel x86_64)
+ *   - Chỉ build Windows, không build Mac → Mac users không nhận auto-update
+ *
+ * Chỉ dùng script này nếu bạn đang chạy từ Windows + CI không khả dụng.
  */
 
 import { execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+
+// Cảnh báo runtime ngay khi script khởi chạy
+console.error('\n⚠️  WARNING: scripts/release.mjs is deprecated.');
+console.error('   Use the CI tag-push flow instead — see docs/developer-guide.md §7.');
+console.error('   Continue in 3s, or Ctrl+C to abort...\n');
+await new Promise((r) => setTimeout(r, 3000));
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dir, '..');          // phieu-luong-app/
