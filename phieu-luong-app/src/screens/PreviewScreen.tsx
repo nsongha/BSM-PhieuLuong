@@ -14,6 +14,7 @@ import {
 import type { Employee, LogEntry, OpenStatus, Settings, SendOptions } from '../lib/api';
 import { api } from '../lib/api';
 import { useOnline } from '../lib/useOnline';
+import { MaskedAmount } from '../components/MaskedAmount';
 
 type Props = {
   employees: Employee[];
@@ -22,10 +23,6 @@ type Props = {
   onBack: () => void;
   onSendReal: (selected: Employee[]) => void;
 };
-
-function formatCurrency(n: number) {
-  return n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫';
-}
 
 export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }: Props) {
   const valid = useMemo(() => employees.filter((e) => e.errors.length === 0), [employees]);
@@ -217,7 +214,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
           <StatCard label="Hợp lệ" value={valid.length} tone="green" />
           <StatCard label="Có lỗi" value={invalid.length} tone={invalid.length > 0 ? 'red' : 'slate'} />
           <StatCard label="Đang chọn" value={selectedEmployees.length} tone="blue" />
-          <StatCard label="Tổng tiền" value={formatCurrency(total)} tone="blue" />
+          <StatCard label="Tổng tiền" value={<MaskedAmount value={total} />} tone="blue" />
         </div>
 
         {trackerError && (
@@ -327,7 +324,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
                       <td className="px-3 py-3 text-slate-600">{e.email}</td>
                       <td className="px-3 py-3 text-slate-700">{e.maNV}</td>
                       <td className="px-3 py-3 text-right tabular-nums font-medium">
-                        {formatCurrency(e.thucNhan)}
+                        <MaskedAmount value={e.thucNhan} />
                       </td>
                       <td className="px-3 py-3">
                         <PriorStatus prior={prior} openInfo={openInfo} />
@@ -530,7 +527,7 @@ function StatCard({
   tone,
 }: {
   label: string;
-  value: string | number;
+  value: React.ReactNode;
   tone: 'green' | 'red' | 'blue' | 'slate';
 }) {
   const colors: Record<typeof tone, string> = {
