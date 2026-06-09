@@ -13,7 +13,11 @@ import {
   RefreshCw,
   TestTube2,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
+
+const HISTORY_PAGE_SIZE = 10;
 import type { LogEntry, LogRecipient, OpenStatus, Settings } from '../lib/api';
 import { api } from '../lib/api';
 
@@ -27,6 +31,14 @@ type View = { kind: 'list' } | { kind: 'detail'; log: LogEntry };
 
 export function HistoryScreen({ logs, settings, onBack }: Props) {
   const [view, setView] = useState<View>({ kind: 'list' });
+  const [page, setPage] = useState(0);
+
+  // Clamp page if logs list shrinks (e.g., navigation back-and-forth).
+  const totalPages = Math.max(1, Math.ceil(logs.length / HISTORY_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const start = currentPage * HISTORY_PAGE_SIZE;
+  const end = Math.min(start + HISTORY_PAGE_SIZE, logs.length);
+  const pagedLogs = logs.slice(start, end);
 
   if (view.kind === 'detail') {
     return (
@@ -57,23 +69,98 @@ export function HistoryScreen({ logs, settings, onBack }: Props) {
           <div className="text-slate-500 text-base">Chưa có lần gửi nào.</div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {logs.map((l) => (
-            <button
-              key={l.id}
-              onClick={() => setView({ kind: 'detail', log: l })}
-              className="card p-5 w-full text-left hover:border-brand-300 hover:shadow-sm transition-all"
-            >
-              <HistoryCard log={l} />
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-28">Kỳ</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-40">Thời gian</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Chế độ</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500 w-16">Tổng</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-green-600 w-20">Thành công</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-red-600 w-20">Thất bại</th>
+                  <th className="px-4 py-2.5 w-10" aria-label="Hành động" />
+                </tr>
+              </thead>
+              <tbody>
+                {pagedLogs.map((l) => (
+                  <HistoryRow
+                    key={l.id}
+                    log={l}
+                    onOpen={() => setView({ kind: 'detail', log: l })}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              rangeStart={start + 1}
+              rangeEnd={end}
+              total={logs.length}
+              onChange={setPage}
+            />
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function HistoryCard({ log }: { log: LogEntry }) {
+function Pagination({
+  page,
+  totalPages,
+  rangeStart,
+  rangeEnd,
+  total,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  rangeStart: number;
+  rangeEnd: number;
+  total: number;
+  onChange: (p: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm text-slate-600 px-1">
+      <div>
+        Hiển thị <b className="text-slate-900">{rangeStart}–{rangeEnd}</b> / {total} đợt gửi
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(0, page - 1))}
+          disabled={page === 0}
+          className="flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          style={{ width: 32, height: 32 }}
+          aria-label="Trang trước"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="px-3 py-1 text-sm text-slate-700 font-medium tabular-nums">
+          {page + 1} / {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(totalPages - 1, page + 1))}
+          disabled={page >= totalPages - 1}
+          className="flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          style={{ width: 32, height: 32 }}
+          aria-label="Trang sau"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HistoryRow({ log, onOpen }: { log: LogEntry; onOpen: () => void }) {
   const when = new Date(log.timestamp);
   const whenStr = when.toLocaleString('vi-VN', {
     year: 'numeric',
@@ -84,54 +171,65 @@ function HistoryCard({ log }: { log: LogEntry }) {
   });
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between flex-wrap gap-2">
-        <div>
-          <div className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-            <Calendar size={18} className="text-slate-400" />
-            Tháng {log.month}/{log.year}
-          </div>
-          <div className="text-sm text-slate-500 mt-1">{whenStr}</div>
-        </div>
-        <div className="flex items-center gap-2">
+    <tr
+      onClick={onOpen}
+      className="group/row border-t border-slate-100 hover:bg-brand-50/40 cursor-pointer transition-colors"
+    >
+      <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
+        <span className="inline-flex items-center gap-1.5">
+          <Calendar size={14} className="text-slate-400" />
+          {log.month}/{log.year}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-slate-600 whitespace-nowrap tabular-nums">{whenStr}</td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {log.dryRun && (
-            <span className="chip bg-blue-100 border-blue-300 text-blue-800">
-              <TestTube2 size={14} />
+            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 px-1.5 py-0.5 text-[11px] font-medium">
+              <TestTube2 size={11} />
               Gửi thử
             </span>
           )}
           {log.simulate && (
-            <span className="chip bg-purple-100 border-purple-300 text-purple-800">
-              <Drama size={14} />
+            <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 border border-purple-200 text-purple-700 px-1.5 py-0.5 text-[11px] font-medium">
+              <Drama size={11} />
               Giả lập
             </span>
           )}
           {log.testMode && !log.simulate && !log.dryRun && (
-            <span className="chip bg-amber-100 border-amber-300 text-amber-800">
-              <FlaskConical size={14} />
+            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 text-amber-700 px-1.5 py-0.5 text-[11px] font-medium">
+              <FlaskConical size={11} />
               Test
             </span>
           )}
+          {!log.dryRun && !log.simulate && !log.testMode && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 border border-slate-200 text-slate-600 px-1.5 py-0.5 text-[11px] font-medium">
+              Gửi thật
+            </span>
+          )}
         </div>
-      </div>
-
-      <div className="flex items-center gap-5 text-base">
-        <span className="text-slate-600">
-          Tổng: <b>{log.total}</b>
+      </td>
+      <td className="px-4 py-3 text-right text-slate-700 font-medium tabular-nums">{log.total}</td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        <span className="inline-flex items-center gap-1 text-green-700 font-semibold">
+          <CheckCircle2 size={14} />
+          {log.succeeded}
         </span>
-        <span className="inline-flex items-center gap-1 text-green-700">
-          <CheckCircle2 size={18} />
-          <b>{log.succeeded}</b>
-        </span>
-        {log.failed > 0 && (
-          <span className="inline-flex items-center gap-1 text-red-700">
-            <XCircle size={18} />
-            <b>{log.failed}</b>
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        {log.failed > 0 ? (
+          <span className="inline-flex items-center gap-1 text-red-700 font-semibold">
+            <XCircle size={14} />
+            {log.failed}
           </span>
+        ) : (
+          <span className="text-slate-300">—</span>
         )}
-        <span className="ml-auto text-sm text-brand-600">Xem chi tiết →</span>
-      </div>
-    </div>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <ChevronRight size={16} className="text-slate-300 group-hover/row:text-brand-500 transition-colors" aria-hidden />
+      </td>
+    </tr>
   );
 }
 

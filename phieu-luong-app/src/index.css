@@ -64,6 +64,23 @@ body {
   }
 }
 
+/* Destructive confirm prompt — brief shake intro then a steady pulse so
+   "Xoá?" feels alarming without becoming annoying. */
+@keyframes pulse-confirm {
+  0%   { transform: scale(1)    translateX(0);    opacity: 1;    }
+  8%   { transform: scale(1.1)  translateX(-2px); opacity: 1;    }
+  16%  { transform: scale(1.1)  translateX(2px);  opacity: 1;    }
+  24%  { transform: scale(1.1)  translateX(-1px); opacity: 1;    }
+  32%  { transform: scale(1.08) translateX(1px);  opacity: 1;    }
+  50%  { transform: scale(1.04) translateX(0);    opacity: 0.85; }
+  100% { transform: scale(1)    translateX(0);    opacity: 1;    }
+}
+
+.animate-pulse-confirm {
+  animation: pulse-confirm 1.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

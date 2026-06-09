@@ -192,6 +192,22 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     return rows;
   }, [employees, search, filters, sort, priorByMaNV, opensByToken]);
 
+  // Prune selection to only rows currently visible (after search/filter).
+  // Hidden rows get dropped so footer count and 'Gửi N phiếu' reflect what's on screen.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (prev.size === 0) return prev;
+      const visible = new Set(displayRows.map((e) => e.rowIndex));
+      let changed = false;
+      const next = new Set<number>();
+      prev.forEach((idx) => {
+        if (visible.has(idx)) next.add(idx);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [displayRows]);
+
   const selectedEmployees = useMemo(
     () => valid.filter((e) => selected.has(e.rowIndex)),
     [valid, selected]
@@ -274,23 +290,8 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     filters.hideErrors,
   ].filter(Boolean).length;
 
-  const modeBanner = opts.simulate
-    ? { bg: '#F3E8FF', text: '#6B21A8', label: '⚠ ĐANG Ở CHẾ ĐỘ GIẢ LẬP — KHÔNG GỬI ĐẾN EMAIL NHÂN VIÊN' }
-    : opts.testMode
-    ? { bg: '#FEF3C7', text: '#92400E', label: '⚠ ĐANG Ở CHẾ ĐỘ TEST — KHÔNG GỬI ĐẾN EMAIL NHÂN VIÊN' }
-    : null;
-
   return (
-    <div className="flex flex-col" style={{ background: '#F7F8FA', minHeight: '100%' }}>
-      {modeBanner && (
-        <div
-          className="text-[11px] font-bold tracking-[1px] text-center py-1.5 px-8 flex-shrink-0"
-          style={{ background: modeBanner.bg, color: modeBanner.text }}
-        >
-          {modeBanner.label}
-        </div>
-      )}
-
+    <div className="flex flex-col flex-1 min-h-0" style={{ background: '#F7F8FA' }}>
       <div
         className="flex items-center justify-between px-8 pt-5 pb-4 flex-shrink-0 bg-white"
         style={{ borderBottom: '1px solid #EEF0F3' }}
@@ -306,27 +307,17 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
           </button>
           <span className="w-px h-6 bg-slate-200 flex-shrink-0" />
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400">
+            <h1 className="text-lg font-semibold text-slate-900" style={{ letterSpacing: -0.3, lineHeight: 1.2 }}>
+              Duyệt thông tin phiếu lương
+            </h1>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400" style={{ marginTop: 2 }}>
               Tháng {opts.month} / {opts.year}
             </div>
-            <h1 className="text-lg font-semibold text-slate-900" style={{ letterSpacing: -0.3, lineHeight: 1.2, marginTop: 2 }}>
-              Xem trước bảng lương
-            </h1>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={doDryRun}
-          disabled={dryRunning || selectedEmployees.length === 0 || opts.simulate || offlineBlocked}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-[7px] rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          title={opts.simulate ? 'Tắt chế độ Giả lập để gửi thử thật' : offlineBlocked ? 'Mất kết nối Internet' : undefined}
-        >
-          <FlaskConical size={13} />
-          {dryRunning ? 'Đang gửi…' : 'Gửi thử'}
-        </button>
       </div>
 
-      <div className="px-8 py-5">
+      <div className="flex-1 min-h-0 overflow-y-auto px-8 py-5">
         <div className="grid grid-cols-4 gap-2.5 mb-3.5">
           {[
             { label: 'Hợp lệ', value: valid.length },
@@ -577,7 +568,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
       </div>
 
       <div
-        className="flex items-center justify-between px-8 py-3.5 bg-white sticky bottom-0"
+        className="flex items-center justify-between px-8 py-3.5 bg-white flex-shrink-0"
         style={{ borderTop: '1px solid #EEF0F3' }}
       >
         <div className="text-xs text-slate-400">

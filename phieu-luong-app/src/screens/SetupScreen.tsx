@@ -93,7 +93,8 @@ export function SetupScreen({ initial, hasPassword, hasTrackerSecret, onBack, on
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-20">
+    <div className="flex flex-col min-h-full">
+      <div className="flex-1 max-w-2xl w-full mx-auto px-6 pt-6 pb-6 space-y-6">
       {onBack && (
         <button onClick={onBack} className="btn-ghost">
           <ArrowLeft size={18} />
@@ -329,7 +330,14 @@ export function SetupScreen({ initial, hasPassword, hasTrackerSecret, onBack, on
         </label>
       </Section>
 
-      <div className="fixed bottom-0 left-0 right-0 z-20 flex justify-end gap-3 bg-white border-t border-slate-200 px-6 py-3">
+      {saveError && (
+        <div className="flex items-start gap-3 rounded-xl p-4 bg-red-50 text-red-800 border border-red-200">
+          <AlertCircle size={20} className="mt-0.5 shrink-0" />
+          <span>{saveError}</span>
+        </div>
+      )}
+      </div>
+      <div className="sticky bottom-0 z-20 flex justify-end gap-3 bg-white border-t border-slate-200 px-6 py-3">
         <button
           disabled={!canSave || saving}
           onClick={doSave}
@@ -338,12 +346,6 @@ export function SetupScreen({ initial, hasPassword, hasTrackerSecret, onBack, on
           {saving ? 'Đang lưu…' : onBack ? 'Lưu thay đổi' : 'Lưu và tiếp tục'}
         </button>
       </div>
-      {saveError && (
-        <div className="flex items-start gap-3 rounded-xl p-4 bg-red-50 text-red-800 border border-red-200">
-          <AlertCircle size={20} className="mt-0.5 shrink-0" />
-          <span>{saveError}</span>
-        </div>
-      )}
     </div>
   );
 }
