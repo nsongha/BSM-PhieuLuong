@@ -5,6 +5,13 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.4] - 2026-06-09
+
+### Added
+- **Tự động che số tiền lương** ở màn Xem trước (cột Thực nhận + ô Tổng tiền) sau khi import — chống nhìn lén thông tin nhạy cảm. Số hiển thị `****`; rê chuột hoặc focus **giữ 5 giây** để hiện: vòng tròn đếm ngược (số giây ở giữa, dòng "Hiển thị trong Xs…" bên cạnh), đủ 5s số thật chạy vào từ phải qua trái ~1s. Rời chuột thì che lại. Tôn trọng `prefers-reduced-motion`.
+
+---
+
 ## [0.2.3] - 2026-05-26
 
 ### Fixed
