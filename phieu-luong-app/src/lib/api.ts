@@ -87,11 +87,18 @@ export type Settings = {
   isConfigured: boolean;
 };
 
+export type EmailTemplate = {
+  name: string;
+  subject: string;
+  body: string;
+};
+
 export type SendOptions = {
   month: string;
   year: string;
   testMode: boolean;
   simulate: boolean;
+  templateIndex?: number; // 0–2, mẫu dùng cho đợt gửi này (mặc định 0)
 };
 
 export type SendProgress =
@@ -165,6 +172,10 @@ type ApiShape = {
   settings: {
     get: () => Promise<{ settings: Settings; hasPassword: boolean; hasTrackerSecret: boolean }>;
     save: (settings: Settings, password?: string, trackerSecret?: string) => Promise<void>;
+  };
+  templates: {
+    get: () => Promise<{ templates: EmailTemplate[]; activeIndex: number }>;
+    save: (templates: EmailTemplate[], activeIndex: number) => Promise<void>;
   };
   log: {
     list: () => Promise<LogEntry[]>;

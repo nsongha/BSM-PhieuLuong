@@ -10,8 +10,10 @@ import {
   FileText,
   SlidersHorizontal,
   ChevronDown,
+  Mail,
+  Pencil,
 } from 'lucide-react';
-import type { Employee, OpenStatus, Settings, SendOptions } from '../lib/api';
+import type { Employee, EmailTemplate, OpenStatus, Settings, SendOptions } from '../lib/api';
 import { api } from '../lib/api';
 import { useOnline } from '../lib/useOnline';
 import { Checkbox } from '../components/Checkbox';
@@ -24,8 +26,30 @@ type Props = {
   settings: Settings;
   opts: SendOptions;
   onBack: () => void;
-  onSendReal: (selected: Employee[]) => void;
+  onSendReal: (selected: Employee[], templateIndex: number) => void;
 };
+
+// Render-client mirrors electron/modules/emailSender.ts (spec 4.3).
+type TemplateVars = {
+  ten: string;
+  thang: string;
+  nam: string;
+  cong_ty: string;
+  mat_khau: string;
+};
+
+function renderClient(text: string, vars: TemplateVars): string {
+  return text.replace(/\{(ten|thang|nam|cong_ty|mat_khau)\}/g,
+    (_m, k: string) => vars[k as keyof TemplateVars]);
+}
+
+const VARIABLE_CHIPS: Array<{ label: string; token: string }> = [
+  { label: 'Tên nhân viên', token: '{ten}' },
+  { label: 'Tháng', token: '{thang}' },
+  { label: 'Năm', token: '{nam}' },
+  { label: 'Công ty', token: '{cong_ty}' },
+  { label: 'Mật khẩu', token: '{mat_khau}' },
+];
 
 type SortCol = 'name' | 'email' | 'ma' | 'salary' | 'status' | null;
 type SortDir = 'asc' | 'desc' | null;
@@ -80,6 +104,40 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   const [priorByMaNV, setPriorByMaNV] = useState<Record<string, PriorSend>>({});
   const [opensByToken, setOpensByToken] = useState<Record<string, OpenStatus>>({});
   const [trackerError, setTrackerError] = useState<string | null>(null);
+
+  // Email templates: 3 presets fetched from main process; activeIndex persists
+  // via templates.save (so reopening the screen restores the chosen template).
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [activeTemplateIndex, setActiveTemplateIndex] = useState(0);
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { templates: t, activeIndex: i } = await api().templates.get();
+      setTemplates(t);
+      setActiveTemplateIndex(i);
+    })().catch((e) => console.error('[templates] load error:', e));
+  }, []);
+
+  const switchTemplate = async (newIndex: number) => {
+    setActiveTemplateIndex(newIndex);
+    try {
+      await api().templates.save(templates, newIndex);
+    } catch (e) {
+      console.error('[templates] save error:', e);
+    }
+  };
+
+  const saveTemplates = async (next: EmailTemplate[], newIndex: number) => {
+    setTemplates(next);
+    setActiveTemplateIndex(newIndex);
+    setTemplateEditorOpen(false);
+    try {
+      await api().templates.save(next, newIndex);
+    } catch (e) {
+      console.error('[templates] save error:', e);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -254,7 +312,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     if (selectedEmployees.length === 0) return;
     setDryRunning(true); setDryResult(null);
     try {
-      const r = await api().email.dryRun(selectedEmployees, settings, opts);
+      const r = await api().email.dryRun(selectedEmployees, settings, { ...opts, templateIndex: activeTemplateIndex });
       if (r.ok) {
         const n = r.sent ?? Math.min(3, selectedEmployees.length);
         setDryResult({ ok: true, msg: `Đã gửi ${n} phiếu mẫu đến ${settings.emailTest}. Đợt gửi thử được lưu trong Lịch sử.` });
@@ -373,6 +431,44 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
             <div className="text-xs text-amber-900">
               <span className="font-semibold">{selectedDuplicates.length} nhân viên</span> đã nhận phiếu kỳ {opts.month}/{opts.year} rồi — gửi thêm sẽ nhận phiếu lần 2.
             </div>
+          </div>
+        )}
+
+        {/* Email template selector — chips of 3 saved presets + Sửa nút */}
+        {templates.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.7px] text-slate-400">
+              <Mail size={12} />
+              Mẫu email
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {templates.map((t, i) => {
+                const active = i === activeTemplateIndex;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => switchTemplate(i)}
+                    className="text-[12px] font-medium px-3 py-1.5 rounded-full transition-colors"
+                    style={{
+                      border: `1px solid ${active ? '#F97316' : '#E5E7EB'}`,
+                      background: active ? '#FFF7ED' : 'white',
+                      color: active ? '#F97316' : '#475569',
+                    }}
+                  >
+                    {t.name || `Mẫu ${i + 1}`}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setTemplateEditorOpen(true)}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-600 hover:text-cta-500 transition-colors ml-1"
+            >
+              <Pencil size={12} />
+              Sửa nội dung
+            </button>
           </div>
         )}
 
@@ -626,9 +722,209 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
           opts={opts}
           emailTest={settings.emailTest}
           onCancel={() => setShowConfirm(false)}
-          onConfirm={() => { setShowConfirm(false); onSendReal(selectedEmployees); }}
+          onConfirm={() => { setShowConfirm(false); onSendReal(selectedEmployees, activeTemplateIndex); }}
         />
       )}
+
+      {templateEditorOpen && templates.length > 0 && (
+        <TemplateEditorModal
+          templates={templates}
+          activeIndex={activeTemplateIndex}
+          sampleEmployee={valid[0]}
+          companyName={settings.companyName ?? ''}
+          month={opts.month}
+          year={opts.year}
+          onClose={() => setTemplateEditorOpen(false)}
+          onSave={saveTemplates}
+        />
+      )}
+    </div>
+  );
+}
+
+function TemplateEditorModal({
+  templates,
+  activeIndex,
+  sampleEmployee,
+  companyName,
+  month,
+  year,
+  onClose,
+  onSave,
+}: {
+  templates: EmailTemplate[];
+  activeIndex: number;
+  sampleEmployee?: Employee;
+  companyName: string;
+  month: string;
+  year: string;
+  onClose: () => void;
+  onSave: (templates: EmailTemplate[], activeIndex: number) => void;
+}) {
+  const [draft, setDraft] = useState<EmailTemplate[]>(() => templates.map((t) => ({ ...t })));
+  const [tab, setTab] = useState(activeIndex);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  const current = draft[tab];
+
+  const updateField = (field: keyof EmailTemplate, value: string) => {
+    setDraft((prev) => prev.map((t, i) => (i === tab ? { ...t, [field]: value } : t)));
+  };
+
+  const insertToken = (token: string) => {
+    const el = bodyRef.current;
+    const body = current.body;
+    const start = el ? el.selectionStart : body.length;
+    const end = el ? el.selectionEnd : body.length;
+    const next = body.slice(0, start) + token + body.slice(end);
+    updateField('body', next);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const vars: TemplateVars = {
+    ten: sampleEmployee?.hoTen ?? 'Nguyễn Văn A',
+    thang: month,
+    nam: year,
+    cong_ty: companyName,
+    mat_khau: sampleEmployee?.pdfPassword ?? 'A1b2C3d4',
+  };
+
+  const previewSubject = renderClient(current.subject, vars);
+  const previewBody = renderClient(current.body, vars);
+  const canSave = current.subject.trim() !== '' && current.body.trim() !== '';
+
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-4"
+        style={{ boxShadow: '0 20px 60px rgba(15,23,42,0.4)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold text-slate-900" style={{ letterSpacing: -0.3 }}>Sửa mẫu email</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-800" aria-label="Đóng">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Tabs — one per draft slot */}
+        <div className="flex items-center gap-1 border-b border-slate-200">
+          {draft.map((t, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setTab(i)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                i === tab
+                  ? 'border-cta-500 text-cta-500'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {t.name || `Mẫu ${i + 1}`}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Editor */}
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500">Tên mẫu</span>
+              <input
+                type="text"
+                value={current.name}
+                onChange={(e) => updateField('name', e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-cta-500 focus:outline-none focus:ring-2 focus:ring-cta-500/30"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500">Tiêu đề</span>
+              <input
+                type="text"
+                value={current.subject}
+                onChange={(e) => updateField('subject', e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-cta-500 focus:outline-none focus:ring-2 focus:ring-cta-500/30"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500">Nội dung</span>
+              <textarea
+                ref={bodyRef}
+                value={current.body}
+                onChange={(e) => updateField('body', e.target.value)}
+                rows={10}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono focus:border-cta-500 focus:outline-none focus:ring-2 focus:ring-cta-500/30 resize-y"
+              />
+            </label>
+
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-1.5">
+                {VARIABLE_CHIPS.map((c) => (
+                  <button
+                    key={c.token}
+                    type="button"
+                    onClick={() => insertToken(c.token)}
+                    className="inline-flex items-center gap-1 rounded-full border border-cta-500/30 bg-cta-500/10 px-2.5 py-1 text-[11px] text-cta-500 hover:bg-cta-500/20 transition-colors"
+                  >
+                    + {c.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Bấm chip để chèn vào Nội dung. Có thể gõ tay vào Tiêu đề:{' '}
+                {VARIABLE_CHIPS.map((c) => (
+                  <code key={c.token} className="bg-slate-100 px-1 py-0.5 rounded mr-1">
+                    {c.token}
+                  </code>
+                ))}
+              </p>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-slate-500">Xem trước</span>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div className="text-xs">
+                <span className="text-slate-500">Tiêu đề: </span>
+                <span className="font-semibold text-slate-900">{previewSubject}</span>
+              </div>
+              <div className="border-t border-slate-200" />
+              <div className="text-sm text-slate-800 whitespace-pre-wrap break-words">{previewBody}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors"
+          >
+            Huỷ
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(draft, tab)}
+            disabled={!canSave}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg text-white bg-cta-500 hover:bg-cta-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title={canSave ? undefined : 'Tiêu đề và nội dung không được để trống'}
+          >
+            <CheckCircle2 size={14} /> Lưu & dùng mẫu này
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import * as fs from 'fs';
+import type { EmailTemplate } from '../preload';
 
 function makeTransporter(user: string, password: string): Transporter {
   return nodemailer.createTransport({
@@ -111,21 +112,34 @@ export function buildAttachmentName(hoTen: string, maNV: string, month: string, 
   return `PhieuLuong_T${month}_${year}_${slug}.pdf`;
 }
 
-export function buildEmailBody(hoTen: string, month: string, year: string, companyName: string, pdfPassword: string) {
-  return `Kính gửi ${hoTen},
+// Token-hoá đúng nội dung hard-code cũ — 5 biến trong {}.
+export const DEFAULT_SUBJECT_TEMPLATE = '[Phiếu lương] Tháng {thang}/{nam}';
 
-Phòng Nhân sự ${companyName} xin gửi phiếu lương tháng ${month}/${year}.
+export const DEFAULT_BODY_TEMPLATE = `Kính gửi {ten},
+
+Phòng Nhân sự {cong_ty} xin gửi phiếu lương tháng {thang}/{nam}.
 
 File PDF đính kèm được bảo vệ bằng mật khẩu. Vui lòng dùng mã sau để mở file:
 
-    Mật khẩu: ${pdfPassword}
+    Mật khẩu: {mat_khau}
 
 Mã này chỉ dùng cho phiếu lương tháng này. Nếu có bất kỳ sai sót nào, vui lòng liên hệ ngay với phòng Nhân sự.
 
 Trân trọng,
-${companyName}`;
-}
+{cong_ty}`;
 
-export function buildSubject(month: string, year: string) {
-  return `[Phiếu lương] Tháng ${month}/${year}`;
+// 3 preset cố định — cả 3 seed giống nhau để mọi mẫu hợp lệ ngay từ đầu.
+export const DEFAULT_EMAIL_TEMPLATES: EmailTemplate[] = [
+  { name: 'Phiếu lương tháng', subject: DEFAULT_SUBJECT_TEMPLATE, body: DEFAULT_BODY_TEMPLATE },
+  { name: 'Mẫu 2',            subject: DEFAULT_SUBJECT_TEMPLATE, body: DEFAULT_BODY_TEMPLATE },
+  { name: 'Mẫu 3',            subject: DEFAULT_SUBJECT_TEMPLATE, body: DEFAULT_BODY_TEMPLATE },
+];
+
+export type TemplateVars = {
+  ten: string; thang: string; nam: string; cong_ty: string; mat_khau: string;
+};
+
+export function renderTemplate(text: string, vars: TemplateVars): string {
+  return text.replace(/\{(ten|thang|nam|cong_ty|mat_khau)\}/g,
+    (_m, k: string) => vars[k as keyof TemplateVars]);
 }

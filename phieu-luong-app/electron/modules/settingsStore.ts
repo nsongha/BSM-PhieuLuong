@@ -1,6 +1,7 @@
 import Store from 'electron-store';
 import { safeStorage } from 'electron';
-import type { Settings, LogEntry, Checkpoint } from '../preload';
+import type { Settings, LogEntry, Checkpoint, EmailTemplate } from '../preload';
+import { DEFAULT_EMAIL_TEMPLATES } from './emailSender';
 
 type SettingsFile = {
   settings?: Settings;
@@ -10,6 +11,8 @@ type SettingsFile = {
   /** Deprecated — plaintext log từ các phiên bản cũ, migrate sang encryptedLog. */
   log?: LogEntry[];
   encryptedLog?: string;
+  emailTemplates?: EmailTemplate[];
+  activeTemplateIndex?: number;
 };
 
 const store = new Store<SettingsFile>({
@@ -145,4 +148,28 @@ export function getCheckpoint(): Checkpoint | null {
 
 export function clearCheckpoint(): void {
   store.delete('encryptedCheckpoint');
+}
+
+export function getEmailTemplates(): EmailTemplate[] {
+  const t = store.get('emailTemplates');
+  if (!Array.isArray(t) || t.length !== 3) return [...DEFAULT_EMAIL_TEMPLATES];
+  // normalize: đảm bảo đủ field
+  return t.map((x, i) => ({
+    name: typeof x?.name === 'string' && x.name ? x.name : DEFAULT_EMAIL_TEMPLATES[i].name,
+    subject: typeof x?.subject === 'string' ? x.subject : DEFAULT_EMAIL_TEMPLATES[i].subject,
+    body: typeof x?.body === 'string' ? x.body : DEFAULT_EMAIL_TEMPLATES[i].body,
+  }));
+}
+
+export function saveEmailTemplates(templates: EmailTemplate[]): void {
+  store.set('emailTemplates', templates.slice(0, 3));
+}
+
+export function getActiveTemplateIndex(): number {
+  const i = store.get('activeTemplateIndex');
+  return typeof i === 'number' && i >= 0 && i <= 2 ? i : 0;
+}
+
+export function setActiveTemplateIndex(i: number): void {
+  store.set('activeTemplateIndex', Math.max(0, Math.min(2, i)));
 }

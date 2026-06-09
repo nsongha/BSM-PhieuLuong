@@ -94,11 +94,18 @@ export type Settings = {
   isConfigured: boolean;
 };
 
+export type EmailTemplate = {
+  name: string;
+  subject: string;
+  body: string;
+};
+
 export type SendOptions = {
   month: string;
   year: string;
   testMode: boolean;
   simulate: boolean;
+  templateIndex?: number; // 0–2, mẫu dùng cho đợt gửi này (mặc định 0)
 };
 
 export type SendProgress =
@@ -190,6 +197,15 @@ const api = {
       }>,
     save: (settings: Settings, password?: string, trackerSecret?: string) =>
       ipcRenderer.invoke('settings:save', settings, password, trackerSecret) as Promise<void>,
+  },
+  templates: {
+    get: () =>
+      ipcRenderer.invoke('templates:get') as Promise<{
+        templates: EmailTemplate[];
+        activeIndex: number;
+      }>,
+    save: (templates: EmailTemplate[], activeIndex: number) =>
+      ipcRenderer.invoke('templates:save', templates, activeIndex) as Promise<void>,
   },
   log: {
     list: () => ipcRenderer.invoke('log:list') as Promise<LogEntry[]>,
