@@ -101,55 +101,60 @@ export function MaskedAmount({
     onBlur: reset,
   };
 
+  const text = format(value);
+  // Base box is ALWAYS sized to the real number, so masked ⇄ counting ⇄ revealed
+  // never reflow — the element can't resize out from under the cursor.
+  const baseClass = `relative inline-block tabular-nums whitespace-pre align-middle cursor-help ${className ?? ''}`;
+  // Invisible sizer reserves the real number's width while hidden.
+  const sizer = (
+    <span aria-hidden="true" className="invisible">
+      {text}
+    </span>
+  );
+
   if (phase === 'counting') {
     const r = (ringSize - 4) / 2;
     const circumference = 2 * Math.PI * r;
     return (
-      <span
-        {...interactionProps}
-        className={`inline-flex items-center gap-1.5 cursor-help align-middle ${className ?? ''}`}
-      >
-        <span className="relative inline-flex shrink-0 items-center justify-center" style={{ width: ringSize, height: ringSize }}>
-          <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`}>
-            <g transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}>
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={r}
-                fill="none"
-                stroke="#E5E7EB"
-                strokeWidth={2}
-              />
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={r}
-                fill="none"
-                stroke="#3B82F6"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference * (1 - progress)}
-              />
-            </g>
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold tabular-nums text-brand-700">
-            {remaining}
+      <span {...interactionProps} className={baseClass}>
+        {sizer}
+        {/* Floating chip — absolutely positioned so its larger width never reflows the
+            cell. Anchored to the right edge; it overflows leftward as a small popover. */}
+        <span className="absolute right-0 top-1/2 z-10 flex -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
+          <span
+            className="relative inline-flex shrink-0 items-center justify-center"
+            style={{ width: ringSize, height: ringSize }}
+          >
+            <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`}>
+              <g transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}>
+                <circle cx={ringSize / 2} cy={ringSize / 2} r={r} fill="none" stroke="#E5E7EB" strokeWidth={2} />
+                <circle
+                  cx={ringSize / 2}
+                  cy={ringSize / 2}
+                  r={r}
+                  fill="none"
+                  stroke="#3B82F6"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference * (1 - progress)}
+                />
+              </g>
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold tabular-nums text-brand-700">
+              {remaining}
+            </span>
           </span>
+          <span className="text-sm text-slate-500">Hiển thị trong {remaining}s…</span>
         </span>
-        <span className="text-sm text-slate-500 whitespace-nowrap">Hiển thị trong {remaining}s…</span>
       </span>
     );
   }
 
   if (phase === 'revealed') {
-    const text = format(value);
     if (reducedMotion) {
       return (
-        <span
-          {...interactionProps}
-          className={`inline-block tabular-nums cursor-help align-middle ${className ?? ''}`}
-        >
+        <span {...interactionProps} className={baseClass}>
           {text}
         </span>
       );
@@ -158,10 +163,7 @@ export function MaskedAmount({
     const charDur = 220;
     const stagger = (revealMs - charDur) / Math.max(1, n - 1);
     return (
-      <span
-        {...interactionProps}
-        className={`inline-block tabular-nums whitespace-pre cursor-help align-middle ${className ?? ''}`}
-      >
+      <span {...interactionProps} className={baseClass}>
         {Array.from(text).map((char, i) => (
           <span
             key={i}
@@ -178,13 +180,11 @@ export function MaskedAmount({
     );
   }
 
-  // masked
+  // masked — **** overlaid on the invisible real-number sizer (right-aligned)
   return (
-    <span
-      {...interactionProps}
-      className={`inline-block cursor-help align-middle ${className ?? ''}`}
-    >
-      ****
+    <span {...interactionProps} className={baseClass}>
+      {sizer}
+      <span className="absolute inset-0 flex items-center justify-end">****</span>
     </span>
   );
 }
