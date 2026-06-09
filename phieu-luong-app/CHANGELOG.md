@@ -5,6 +5,17 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.1] - 2026-06-09
+
+### Added (email template editor)
+- **3 mẫu email lưu sẵn** trong Cài đặt; chọn mẫu khi gửi đợt nào không cần soạn lại. Lưu vĩnh viễn qua `settingsStore` (key `emailTemplates` + `activeTemplateIndex`).
+- **Selector chip** trên PreviewScreen — phía trên thanh search, hiển thị label "Mẫu email" + 3 chip click-to-switch (chip active = nền cam `#FFF7ED`, border cam). Nút **"✎ Sửa nội dung"** mở modal editor.
+- **Modal editor**: 3 tabs (mỗi tab 1 mẫu), 3 ô nhập (Tên mẫu / Tiêu đề / Nội dung), preview render real-time bên phải. Variable chips `{ten} {thang} {nam} {cong_ty} {mat_khau}` — click chip để chèn vào nội dung tại vị trí con trỏ; vẫn gõ tay được vào Tiêu đề.
+- **Mẫu đang dùng** được pass đi qua `templateIndex` trong `SendOptions` cho cả `Gửi thử` (dry-run) và `Gửi thật`. Khi đổi mẫu nhanh từ chip, lựa chọn được nhớ qua `templates.save`.
+- Render-client trong PreviewScreen mirror logic `renderTemplate` trong `electron/modules/emailSender.ts` — preview hiển thị **đúng** với email thật.
+
+---
+
 ## [0.3.0] - 2026-06-09
 
 ### Changed (UI redesign — sidebar shell + orange brand)
