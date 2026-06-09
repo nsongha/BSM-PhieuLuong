@@ -14,10 +14,16 @@ jobs:
         include:
           - os: macos-latest
             target: mac
-            artifact: phieu-luong-app/release/*.dmg
+            artifact: |
+              phieu-luong-app/release/*.dmg
+              phieu-luong-app/release/*.dmg.blockmap
+              phieu-luong-app/release/latest-mac.yml
           - os: windows-latest
             target: win
-            artifact: phieu-luong-app/release/*.exe
+            artifact: |
+              phieu-luong-app/release/*.exe
+              phieu-luong-app/release/*.exe.blockmap
+              phieu-luong-app/release/latest.yml
 
     runs-on: ${{ matrix.os }}
 
@@ -45,8 +51,14 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      # `--publish never` keeps electron-builder from auto-uploading during
+      # build (which previously failed with "GH_TOKEN not set"). The dedicated
+      # `release` job below handles publishing after both targets build.
       - name: Build
-        run: npm run build:${{ matrix.target }}
+        run: |
+          npm run build:renderer
+          npm run build:electron
+          npx electron-builder --${{ matrix.target }} --publish never
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
