@@ -7,8 +7,7 @@ import {
   testConnection,
   sendWithRetry,
   buildAttachmentName,
-  buildEmailBody,
-  buildSubject,
+  renderTemplate,
 } from '../modules/emailSender';
 import {
   getSettings,
@@ -20,6 +19,10 @@ import {
   saveCheckpoint,
   getCheckpoint,
   clearCheckpoint,
+  getEmailTemplates,
+  getActiveTemplateIndex,
+  saveEmailTemplates,
+  setActiveTemplateIndex,
 } from '../modules/settingsStore';
 import type {
   Employee,
@@ -30,10 +33,20 @@ import type {
   LogEntry,
   LogRecipient,
   Checkpoint,
+  EmailTemplate,
 } from '../preload';
 
 let cancelRequested = false;
 let batchInProgress = false;
+
+// Render mẫu cho 1 nhân viên — thay 5 biến rồi trả subject + body text thuần.
+function renderFor(tpl: EmailTemplate, emp: Employee, opts: SendOptions, settings: Settings) {
+  const vars = {
+    ten: emp.hoTen, thang: opts.month, nam: opts.year,
+    cong_ty: settings.companyName, mat_khau: emp.pdfPassword,
+  };
+  return { subject: renderTemplate(tpl.subject, vars), body: renderTemplate(tpl.body, vars) };
+}
 
 export function registerIpcHandlers() {
   ipcMain.handle('email:cancel', async () => {
@@ -101,6 +114,10 @@ export function registerIpcHandlers() {
               employees[employees.length - 1],
             ];
 
+      // Resolve mẫu 1 lần ở đầu — sửa mẫu giữa chừng không ảnh hưởng đợt này.
+      const _tpls = getEmailTemplates();
+      const tpl = _tpls[opts.templateIndex ?? getActiveTemplateIndex()] ?? _tpls[0];
+
       const recipients: LogRecipient[] = [];
       let succeeded = 0;
       let failed = 0;
@@ -116,15 +133,16 @@ export function registerIpcHandlers() {
         try {
           const { pdfPath } = await renderPayslipPdf(emp, settings, opts);
           try {
+            const r = renderFor(tpl, emp, opts, settings);
             await sendWithRetry({
               user: settings.emailUser,
               password: pw,
               fromName: settings.companyName,
               to: settings.emailTest,
-              subject: `[GỬI THỬ] ${buildSubject(opts.month, opts.year)} — ${emp.hoTen}`,
+              subject: `[GỬI THỬ] ${r.subject} — ${emp.hoTen}`,
               body:
                 `[GỬI THỬ] Email mẫu — nếu gửi thật sẽ đến: ${emp.email}\n\n` +
-                buildEmailBody(emp.hoTen, opts.month, opts.year, settings.companyName, emp.pdfPassword),
+                r.body,
               attachmentPath: pdfPath,
               attachmentName: buildAttachmentName(emp.hoTen, emp.maNV, opts.month, opts.year),
               trackerPixelUrl,
@@ -190,6 +208,10 @@ export function registerIpcHandlers() {
       send({ kind: 'start', total: employees.length });
 
       try {
+
+      // Resolve mẫu 1 lần ở đầu batch — sửa mẫu giữa chừng không ảnh hưởng batch đang chạy.
+      const _tpls = getEmailTemplates();
+      const tpl = _tpls[opts.templateIndex ?? getActiveTemplateIndex()] ?? _tpls[0];
 
       // Resume nếu đúng batch còn checkpoint — skip các row đã xử lý
       const existing = getCheckpoint();
@@ -305,13 +327,14 @@ export function registerIpcHandlers() {
             ? `[CHẾ ĐỘ TEST] Email này đáng lẽ gửi đến: ${emp.email}\n\n`
             : '';
           try {
+            const r = renderFor(tpl, emp, opts, settings);
             await sendWithRetry({
               user: settings.emailUser,
               password: pw!,
               fromName: settings.companyName,
               to: recipientEmail,
-              subject: (opts.testMode ? '[TEST] ' : '') + buildSubject(opts.month, opts.year),
-              body: bodyPrefix + buildEmailBody(emp.hoTen, opts.month, opts.year, settings.companyName, emp.pdfPassword),
+              subject: (opts.testMode ? '[TEST] ' : '') + r.subject,
+              body: bodyPrefix + r.body,
               attachmentPath: pdfPath,
               attachmentName: buildAttachmentName(emp.hoTen, emp.maNV, opts.month, opts.year),
               trackerPixelUrl,
@@ -435,6 +458,20 @@ export function registerIpcHandlers() {
       saveSettings(s, password, trackerSecret);
     }
   );
+  ipcMain.handle('templates:get', async () => ({
+    templates: getEmailTemplates(),
+    activeIndex: getActiveTemplateIndex(),
+  }));
+
+  ipcMain.handle(
+    'templates:save',
+    async (_e, templates: EmailTemplate[], activeIndex: number) => {
+      if (batchInProgress) throw new Error('Đang có đợt gửi — không thể đổi mẫu lúc này.');
+      saveEmailTemplates(templates);
+      setActiveTemplateIndex(activeIndex);
+    }
+  );
+
   ipcMain.handle('log:list', async () => getLog());
 
   ipcMain.handle('checkpoint:get', async () => getCheckpoint());

@@ -10,8 +10,10 @@ import {
   FileText,
   SlidersHorizontal,
   ChevronDown,
+  Pencil,
+  Check,
 } from 'lucide-react';
-import type { Employee, OpenStatus, Settings, SendOptions } from '../lib/api';
+import type { Employee, EmailTemplate, OpenStatus, Settings, SendOptions } from '../lib/api';
 import { api } from '../lib/api';
 import { useOnline } from '../lib/useOnline';
 import { Checkbox } from '../components/Checkbox';
@@ -24,8 +26,30 @@ type Props = {
   settings: Settings;
   opts: SendOptions;
   onBack: () => void;
-  onSendReal: (selected: Employee[]) => void;
+  onSendReal: (selected: Employee[], templateIndex: number) => void;
 };
+
+// Render-client mirrors electron/modules/emailSender.ts (spec 4.3).
+type TemplateVars = {
+  ten: string;
+  thang: string;
+  nam: string;
+  cong_ty: string;
+  mat_khau: string;
+};
+
+function renderClient(text: string, vars: TemplateVars): string {
+  return text.replace(/\{(ten|thang|nam|cong_ty|mat_khau)\}/g,
+    (_m, k: string) => vars[k as keyof TemplateVars]);
+}
+
+const VARIABLE_CHIPS: Array<{ label: string; token: string }> = [
+  { label: 'Tên nhân viên', token: '{ten}' },
+  { label: 'Tháng', token: '{thang}' },
+  { label: 'Năm', token: '{nam}' },
+  { label: 'Công ty', token: '{cong_ty}' },
+  { label: 'Mật khẩu', token: '{mat_khau}' },
+];
 
 type SortCol = 'name' | 'email' | 'ma' | 'salary' | 'status' | null;
 type SortDir = 'asc' | 'desc' | null;
@@ -80,6 +104,74 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   const [priorByMaNV, setPriorByMaNV] = useState<Record<string, PriorSend>>({});
   const [opensByToken, setOpensByToken] = useState<Record<string, OpenStatus>>({});
   const [trackerError, setTrackerError] = useState<string | null>(null);
+
+  // Email templates: 3 presets fetched from main process; activeIndex persists
+  // via templates.save (so reopening the screen restores the chosen template).
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [activeTemplateIndex, setActiveTemplateIndex] = useState(0);
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
+  const [editingTemplateIndex, setEditingTemplateIndex] = useState(0);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside handler for the template dropdown menu (footer split button).
+  // Doesn't apply to the editor modal — that has its own X-only dismiss.
+  useEffect(() => {
+    if (!templateMenuOpen) return;
+    const clickHandler = (e: MouseEvent) => {
+      if (templateMenuRef.current && !templateMenuRef.current.contains(e.target as Node)) {
+        setTemplateMenuOpen(false);
+      }
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTemplateMenuOpen(false);
+    };
+    document.addEventListener('click', clickHandler);
+    document.addEventListener('keydown', keyHandler);
+    return () => {
+      document.removeEventListener('click', clickHandler);
+      document.removeEventListener('keydown', keyHandler);
+    };
+  }, [templateMenuOpen]);
+
+  // Esc closes the editor modal too (X / Huỷ still available; backdrop click
+  // is intentionally inert per UX spec — sidebar stays interactive).
+  useEffect(() => {
+    if (!templateEditorOpen) return;
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTemplateEditorOpen(false);
+    };
+    document.addEventListener('keydown', keyHandler);
+    return () => document.removeEventListener('keydown', keyHandler);
+  }, [templateEditorOpen]);
+
+  useEffect(() => {
+    (async () => {
+      const { templates: t, activeIndex: i } = await api().templates.get();
+      setTemplates(t);
+      setActiveTemplateIndex(i);
+    })().catch((e) => console.error('[templates] load error:', e));
+  }, []);
+
+  const switchTemplate = async (newIndex: number) => {
+    setActiveTemplateIndex(newIndex);
+    try {
+      await api().templates.save(templates, newIndex);
+    } catch (e) {
+      console.error('[templates] save error:', e);
+    }
+  };
+
+  const saveTemplates = async (next: EmailTemplate[], newIndex: number) => {
+    setTemplates(next);
+    setActiveTemplateIndex(newIndex);
+    setTemplateEditorOpen(false);
+    try {
+      await api().templates.save(next, newIndex);
+    } catch (e) {
+      console.error('[templates] save error:', e);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -254,7 +346,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
     if (selectedEmployees.length === 0) return;
     setDryRunning(true); setDryResult(null);
     try {
-      const r = await api().email.dryRun(selectedEmployees, settings, opts);
+      const r = await api().email.dryRun(selectedEmployees, settings, { ...opts, templateIndex: activeTemplateIndex });
       if (r.ok) {
         const n = r.sent ?? Math.min(3, selectedEmployees.length);
         setDryResult({ ok: true, msg: `Đã gửi ${n} phiếu mẫu đến ${settings.emailTest}. Đợt gửi thử được lưu trong Lịch sử.` });
@@ -288,7 +380,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   ].filter(Boolean).length;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0" style={{ background: '#F7F8FA' }}>
+    <div className="relative flex flex-col flex-1 min-h-0" style={{ background: '#F7F8FA' }}>
       <div
         className="flex items-center justify-between px-8 pt-5 pb-4 flex-shrink-0 bg-white"
         style={{ borderBottom: '1px solid #EEF0F3' }}
@@ -585,20 +677,126 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
             <FlaskConical size={14} />
             {dryRunning ? 'Đang gửi thử…' : 'Gửi thử'}
           </button>
-          <button
-            type="button"
-            disabled={selectedEmployees.length === 0 || offlineBlocked}
-            onClick={() => setShowConfirm(true)}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg text-white transition-colors disabled:cursor-not-allowed"
-            style={{
-              background: selectedEmployees.length === 0 ? '#CBD5E1' : '#F97316',
-              boxShadow: selectedEmployees.length === 0 ? 'none' : '0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(249,115,22,0.35)',
-            }}
-            title={offlineBlocked ? 'Mất kết nối Internet' : undefined}
-          >
-            <Send size={14} />
-            Gửi {selectedEmployees.length} phiếu
-          </button>
+          {/* Split button: main "Gửi N phiếu" + chevron toggles template dropdown */}
+          <div className="relative inline-flex items-center" ref={templateMenuRef}>
+            <button
+              type="button"
+              disabled={selectedEmployees.length === 0 || offlineBlocked}
+              onClick={() => {
+                // Also close dropdown so it doesn't sit underneath the confirm modal.
+                setTemplateMenuOpen(false);
+                setShowConfirm(true);
+              }}
+              className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 text-white transition-colors disabled:cursor-not-allowed ${
+                templates.length > 0 ? 'rounded-l-lg' : 'rounded-lg'
+              }`}
+              style={{
+                background: selectedEmployees.length === 0 ? '#CBD5E1' : '#F97316',
+                boxShadow:
+                  selectedEmployees.length === 0
+                    ? 'none'
+                    : '0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(249,115,22,0.35)',
+              }}
+              title={offlineBlocked ? 'Mất kết nối Internet' : undefined}
+            >
+              <Send size={14} />
+              Gửi {selectedEmployees.length} phiếu
+            </button>
+            {templates.length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTemplateMenuOpen((v) => !v);
+                }}
+                className="flex items-center justify-center px-2.5 py-2 rounded-r-lg text-white transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                style={{
+                  background: '#F97316',
+                  boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(249,115,22,0.35)',
+                  borderLeft: '1px solid rgba(255,255,255,0.25)',
+                  alignSelf: 'stretch', // match height of main button
+                }}
+                aria-haspopup="menu"
+                aria-expanded={templateMenuOpen}
+                aria-label="Chọn mẫu email"
+                title="Chọn mẫu email"
+              >
+                <ChevronDown
+                  size={14}
+                  className="transition-transform duration-150"
+                  style={{ transform: templateMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                />
+              </button>
+            )}
+
+            {templateMenuOpen && templates.length > 0 && (
+              <div
+                role="menu"
+                className="absolute z-30 bg-white rounded-lg overflow-hidden"
+                style={{
+                  bottom: 'calc(100% + 6px)',
+                  right: 0,
+                  minWidth: 240,
+                  maxWidth: 360,
+                  border: '1px solid #E5E7EB',
+                  boxShadow: '0 12px 32px rgba(15,23,42,0.12), 0 2px 4px rgba(15,23,42,0.06)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400">
+                  Mẫu email
+                </div>
+                <div className="flex flex-col">
+                  {templates.map((t, i) => {
+                    const active = i === activeTemplateIndex;
+                    return (
+                      <div
+                        key={i}
+                        className={`group/row flex items-stretch transition-colors ${
+                          active ? 'bg-cta-500/5' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={active}
+                          onClick={() => {
+                            switchTemplate(i);
+                            setTemplateMenuOpen(false);
+                          }}
+                          className="flex-1 flex items-center justify-between gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cta-500/40 focus-visible:rounded"
+                        >
+                          <span
+                            className={`text-sm truncate ${
+                              active ? 'font-semibold text-cta-500' : 'text-slate-700'
+                            }`}
+                          >
+                            {t.name || `Mẫu ${i + 1}`}
+                          </span>
+                          {active && <Check size={14} className="text-cta-500 flex-shrink-0" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTemplateIndex(i);
+                            setTemplateEditorOpen(true);
+                            setTemplateMenuOpen(false);
+                          }}
+                          className="flex-shrink-0 flex items-center justify-center mr-1.5 my-1 rounded text-slate-400 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 hover:text-slate-900 hover:bg-slate-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cta-500/40"
+                          style={{ width: 26 }}
+                          aria-label={`Sửa ${t.name || `Mẫu ${i + 1}`}`}
+                          title="Sửa nội dung mẫu này"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -626,9 +824,211 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
           opts={opts}
           emailTest={settings.emailTest}
           onCancel={() => setShowConfirm(false)}
-          onConfirm={() => { setShowConfirm(false); onSendReal(selectedEmployees); }}
+          onConfirm={() => { setShowConfirm(false); onSendReal(selectedEmployees, activeTemplateIndex); }}
         />
       )}
+
+      {templateEditorOpen && templates.length > 0 && (
+        <TemplateEditorModal
+          templates={templates}
+          initialIndex={editingTemplateIndex}
+          sampleEmployee={valid[0]}
+          companyName={settings.companyName ?? ''}
+          month={opts.month}
+          year={opts.year}
+          onClose={() => setTemplateEditorOpen(false)}
+          onSave={saveTemplates}
+        />
+      )}
+    </div>
+  );
+}
+
+function TemplateEditorModal({
+  templates,
+  initialIndex,
+  sampleEmployee,
+  companyName,
+  month,
+  year,
+  onClose,
+  onSave,
+}: {
+  templates: EmailTemplate[];
+  initialIndex: number;
+  sampleEmployee?: Employee;
+  companyName: string;
+  month: string;
+  year: string;
+  onClose: () => void;
+  onSave: (templates: EmailTemplate[], activeIndex: number) => void;
+}) {
+  const [draft, setDraft] = useState<EmailTemplate[]>(() => templates.map((t) => ({ ...t })));
+  const [tab, setTab] = useState(initialIndex);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  const current = draft[tab];
+
+  const updateField = (field: keyof EmailTemplate, value: string) => {
+    setDraft((prev) => prev.map((t, i) => (i === tab ? { ...t, [field]: value } : t)));
+  };
+
+  const insertToken = (token: string) => {
+    const el = bodyRef.current;
+    const body = current.body;
+    const start = el ? el.selectionStart : body.length;
+    const end = el ? el.selectionEnd : body.length;
+    const next = body.slice(0, start) + token + body.slice(end);
+    updateField('body', next);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const vars: TemplateVars = {
+    ten: sampleEmployee?.hoTen ?? 'Nguyễn Văn A',
+    thang: month,
+    nam: year,
+    cong_ty: companyName,
+    mat_khau: sampleEmployee?.pdfPassword ?? 'A1b2C3d4',
+  };
+
+  const previewSubject = renderClient(current.subject, vars);
+  const previewBody = renderClient(current.body, vars);
+  const canSave = current.subject.trim() !== '' && current.body.trim() !== '';
+
+  return (
+    // Backdrop is `absolute inset-0` (anchored to PreviewScreen's `relative` root)
+    // — covers only the content column, leaving the sidebar interactive. No
+    // onClick={onClose}: clicking outside the dialog does NOT close it; only
+    // the X button (or Huỷ / Lưu actions) dismisses.
+    <div
+      className="absolute inset-0 flex items-center justify-center z-40 p-4"
+      style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
+    >
+      <div
+        className="bg-white rounded-2xl p-6 max-w-3xl w-full max-h-[90%] overflow-y-auto space-y-4"
+        style={{ boxShadow: '0 20px 60px rgba(15,23,42,0.4)' }}
+      >
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold text-slate-900" style={{ letterSpacing: -0.3 }}>Sửa mẫu email</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-800" aria-label="Đóng">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Tabs — one per draft slot */}
+        <div className="flex items-center gap-1 border-b border-slate-200">
+          {draft.map((t, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setTab(i)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                i === tab
+                  ? 'border-cta-500 text-cta-500'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {t.name || `Mẫu ${i + 1}`}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Editor */}
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500">Tên mẫu</span>
+              <input
+                type="text"
+                value={current.name}
+                onChange={(e) => updateField('name', e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-cta-500 focus:outline-none focus:ring-2 focus:ring-cta-500/30"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500">Tiêu đề</span>
+              <input
+                type="text"
+                value={current.subject}
+                onChange={(e) => updateField('subject', e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-cta-500 focus:outline-none focus:ring-2 focus:ring-cta-500/30"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500">Nội dung</span>
+              <textarea
+                ref={bodyRef}
+                value={current.body}
+                onChange={(e) => updateField('body', e.target.value)}
+                rows={10}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono focus:border-cta-500 focus:outline-none focus:ring-2 focus:ring-cta-500/30 resize-y"
+              />
+            </label>
+
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-1.5">
+                {VARIABLE_CHIPS.map((c) => (
+                  <button
+                    key={c.token}
+                    type="button"
+                    onClick={() => insertToken(c.token)}
+                    className="inline-flex items-center gap-1 rounded-full border border-cta-500/30 bg-cta-500/10 px-2.5 py-1 text-[11px] text-cta-500 hover:bg-cta-500/20 transition-colors"
+                  >
+                    + {c.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Bấm chip để chèn vào Nội dung. Có thể gõ tay vào Tiêu đề:{' '}
+                {VARIABLE_CHIPS.map((c) => (
+                  <code key={c.token} className="bg-slate-100 px-1 py-0.5 rounded mr-1">
+                    {c.token}
+                  </code>
+                ))}
+              </p>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-slate-500">Xem trước</span>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div className="text-xs">
+                <span className="text-slate-500">Tiêu đề: </span>
+                <span className="font-semibold text-slate-900">{previewSubject}</span>
+              </div>
+              <div className="border-t border-slate-200" />
+              <div className="text-sm text-slate-800 whitespace-pre-wrap break-words">{previewBody}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors"
+          >
+            Huỷ
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(draft, tab)}
+            disabled={!canSave}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg text-white bg-cta-500 hover:bg-cta-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title={canSave ? undefined : 'Tiêu đề và nội dung không được để trống'}
+          >
+            <CheckCircle2 size={14} /> Lưu & dùng mẫu này
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

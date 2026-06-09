@@ -413,11 +413,11 @@ export function App() {
               settings={settings}
               opts={{ ...sendOpts, testMode, simulate }}
               onBack={() => setRoute({ name: 'home' })}
-              onSendReal={(selected) =>
+              onSendReal={(selected, templateIndex) =>
                 setRoute({
                   name: 'sending',
                   employees: selected,
-                  opts: { ...sendOpts, testMode, simulate },
+                  opts: { ...sendOpts, testMode, simulate, templateIndex },
                 })
               }
             />
