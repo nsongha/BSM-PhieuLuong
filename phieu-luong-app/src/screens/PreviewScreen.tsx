@@ -10,8 +10,8 @@ import {
   FileText,
   SlidersHorizontal,
   ChevronDown,
-  Mail,
   Pencil,
+  Check,
 } from 'lucide-react';
 import type { Employee, EmailTemplate, OpenStatus, Settings, SendOptions } from '../lib/api';
 import { api } from '../lib/api';
@@ -109,7 +109,41 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   // via templates.save (so reopening the screen restores the chosen template).
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [activeTemplateIndex, setActiveTemplateIndex] = useState(0);
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
   const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
+  const [editingTemplateIndex, setEditingTemplateIndex] = useState(0);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside handler for the template dropdown menu (footer split button).
+  // Doesn't apply to the editor modal — that has its own X-only dismiss.
+  useEffect(() => {
+    if (!templateMenuOpen) return;
+    const clickHandler = (e: MouseEvent) => {
+      if (templateMenuRef.current && !templateMenuRef.current.contains(e.target as Node)) {
+        setTemplateMenuOpen(false);
+      }
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTemplateMenuOpen(false);
+    };
+    document.addEventListener('click', clickHandler);
+    document.addEventListener('keydown', keyHandler);
+    return () => {
+      document.removeEventListener('click', clickHandler);
+      document.removeEventListener('keydown', keyHandler);
+    };
+  }, [templateMenuOpen]);
+
+  // Esc closes the editor modal too (X / Huỷ still available; backdrop click
+  // is intentionally inert per UX spec — sidebar stays interactive).
+  useEffect(() => {
+    if (!templateEditorOpen) return;
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTemplateEditorOpen(false);
+    };
+    document.addEventListener('keydown', keyHandler);
+    return () => document.removeEventListener('keydown', keyHandler);
+  }, [templateEditorOpen]);
 
   useEffect(() => {
     (async () => {
@@ -346,7 +380,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
   ].filter(Boolean).length;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0" style={{ background: '#F7F8FA' }}>
+    <div className="relative flex flex-col flex-1 min-h-0" style={{ background: '#F7F8FA' }}>
       <div
         className="flex items-center justify-between px-8 pt-5 pb-4 flex-shrink-0 bg-white"
         style={{ borderBottom: '1px solid #EEF0F3' }}
@@ -431,44 +465,6 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
             <div className="text-xs text-amber-900">
               <span className="font-semibold">{selectedDuplicates.length} nhân viên</span> đã nhận phiếu kỳ {opts.month}/{opts.year} rồi — gửi thêm sẽ nhận phiếu lần 2.
             </div>
-          </div>
-        )}
-
-        {/* Email template selector — chips of 3 saved presets + Sửa nút */}
-        {templates.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap mb-3">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.7px] text-slate-400">
-              <Mail size={12} />
-              Mẫu email
-            </span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {templates.map((t, i) => {
-                const active = i === activeTemplateIndex;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => switchTemplate(i)}
-                    className="text-[12px] font-medium px-3 py-1.5 rounded-full transition-colors"
-                    style={{
-                      border: `1px solid ${active ? '#F97316' : '#E5E7EB'}`,
-                      background: active ? '#FFF7ED' : 'white',
-                      color: active ? '#F97316' : '#475569',
-                    }}
-                  >
-                    {t.name || `Mẫu ${i + 1}`}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={() => setTemplateEditorOpen(true)}
-              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-600 hover:text-cta-500 transition-colors ml-1"
-            >
-              <Pencil size={12} />
-              Sửa nội dung
-            </button>
           </div>
         )}
 
@@ -681,20 +677,126 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
             <FlaskConical size={14} />
             {dryRunning ? 'Đang gửi thử…' : 'Gửi thử'}
           </button>
-          <button
-            type="button"
-            disabled={selectedEmployees.length === 0 || offlineBlocked}
-            onClick={() => setShowConfirm(true)}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg text-white transition-colors disabled:cursor-not-allowed"
-            style={{
-              background: selectedEmployees.length === 0 ? '#CBD5E1' : '#F97316',
-              boxShadow: selectedEmployees.length === 0 ? 'none' : '0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(249,115,22,0.35)',
-            }}
-            title={offlineBlocked ? 'Mất kết nối Internet' : undefined}
-          >
-            <Send size={14} />
-            Gửi {selectedEmployees.length} phiếu
-          </button>
+          {/* Split button: main "Gửi N phiếu" + chevron toggles template dropdown */}
+          <div className="relative inline-flex items-center" ref={templateMenuRef}>
+            <button
+              type="button"
+              disabled={selectedEmployees.length === 0 || offlineBlocked}
+              onClick={() => {
+                // Also close dropdown so it doesn't sit underneath the confirm modal.
+                setTemplateMenuOpen(false);
+                setShowConfirm(true);
+              }}
+              className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 text-white transition-colors disabled:cursor-not-allowed ${
+                templates.length > 0 ? 'rounded-l-lg' : 'rounded-lg'
+              }`}
+              style={{
+                background: selectedEmployees.length === 0 ? '#CBD5E1' : '#F97316',
+                boxShadow:
+                  selectedEmployees.length === 0
+                    ? 'none'
+                    : '0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(249,115,22,0.35)',
+              }}
+              title={offlineBlocked ? 'Mất kết nối Internet' : undefined}
+            >
+              <Send size={14} />
+              Gửi {selectedEmployees.length} phiếu
+            </button>
+            {templates.length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTemplateMenuOpen((v) => !v);
+                }}
+                className="flex items-center justify-center px-2.5 py-2 rounded-r-lg text-white transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                style={{
+                  background: '#F97316',
+                  boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(249,115,22,0.35)',
+                  borderLeft: '1px solid rgba(255,255,255,0.25)',
+                  alignSelf: 'stretch', // match height of main button
+                }}
+                aria-haspopup="menu"
+                aria-expanded={templateMenuOpen}
+                aria-label="Chọn mẫu email"
+                title="Chọn mẫu email"
+              >
+                <ChevronDown
+                  size={14}
+                  className="transition-transform duration-150"
+                  style={{ transform: templateMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                />
+              </button>
+            )}
+
+            {templateMenuOpen && templates.length > 0 && (
+              <div
+                role="menu"
+                className="absolute z-30 bg-white rounded-lg overflow-hidden"
+                style={{
+                  bottom: 'calc(100% + 6px)',
+                  right: 0,
+                  minWidth: 240,
+                  maxWidth: 360,
+                  border: '1px solid #E5E7EB',
+                  boxShadow: '0 12px 32px rgba(15,23,42,0.12), 0 2px 4px rgba(15,23,42,0.06)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.7px] text-slate-400">
+                  Mẫu email
+                </div>
+                <div className="flex flex-col">
+                  {templates.map((t, i) => {
+                    const active = i === activeTemplateIndex;
+                    return (
+                      <div
+                        key={i}
+                        className={`group/row flex items-stretch transition-colors ${
+                          active ? 'bg-cta-500/5' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={active}
+                          onClick={() => {
+                            switchTemplate(i);
+                            setTemplateMenuOpen(false);
+                          }}
+                          className="flex-1 flex items-center justify-between gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cta-500/40 focus-visible:rounded"
+                        >
+                          <span
+                            className={`text-sm truncate ${
+                              active ? 'font-semibold text-cta-500' : 'text-slate-700'
+                            }`}
+                          >
+                            {t.name || `Mẫu ${i + 1}`}
+                          </span>
+                          {active && <Check size={14} className="text-cta-500 flex-shrink-0" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTemplateIndex(i);
+                            setTemplateEditorOpen(true);
+                            setTemplateMenuOpen(false);
+                          }}
+                          className="flex-shrink-0 flex items-center justify-center mr-1.5 my-1 rounded text-slate-400 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 hover:text-slate-900 hover:bg-slate-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cta-500/40"
+                          style={{ width: 26 }}
+                          aria-label={`Sửa ${t.name || `Mẫu ${i + 1}`}`}
+                          title="Sửa nội dung mẫu này"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -729,7 +831,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
       {templateEditorOpen && templates.length > 0 && (
         <TemplateEditorModal
           templates={templates}
-          activeIndex={activeTemplateIndex}
+          initialIndex={editingTemplateIndex}
           sampleEmployee={valid[0]}
           companyName={settings.companyName ?? ''}
           month={opts.month}
@@ -744,7 +846,7 @@ export function PreviewScreen({ employees, settings, opts, onBack, onSendReal }:
 
 function TemplateEditorModal({
   templates,
-  activeIndex,
+  initialIndex,
   sampleEmployee,
   companyName,
   month,
@@ -753,7 +855,7 @@ function TemplateEditorModal({
   onSave,
 }: {
   templates: EmailTemplate[];
-  activeIndex: number;
+  initialIndex: number;
   sampleEmployee?: Employee;
   companyName: string;
   month: string;
@@ -762,7 +864,7 @@ function TemplateEditorModal({
   onSave: (templates: EmailTemplate[], activeIndex: number) => void;
 }) {
   const [draft, setDraft] = useState<EmailTemplate[]>(() => templates.map((t) => ({ ...t })));
-  const [tab, setTab] = useState(activeIndex);
+  const [tab, setTab] = useState(initialIndex);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const current = draft[tab];
@@ -799,15 +901,17 @@ function TemplateEditorModal({
   const canSave = current.subject.trim() !== '' && current.body.trim() !== '';
 
   return (
+    // Backdrop is `absolute inset-0` (anchored to PreviewScreen's `relative` root)
+    // — covers only the content column, leaving the sidebar interactive. No
+    // onClick={onClose}: clicking outside the dialog does NOT close it; only
+    // the X button (or Huỷ / Lưu actions) dismisses.
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      className="absolute inset-0 flex items-center justify-center z-40 p-4"
       style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-4"
+        className="bg-white rounded-2xl p-6 max-w-3xl w-full max-h-[90%] overflow-y-auto space-y-4"
         style={{ boxShadow: '0 20px 60px rgba(15,23,42,0.4)' }}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-slate-900" style={{ letterSpacing: -0.3 }}>Sửa mẫu email</h2>

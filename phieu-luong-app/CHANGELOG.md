@@ -9,10 +9,12 @@ Format theo [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added (email template editor)
 - **3 mẫu email lưu sẵn** trong Cài đặt; chọn mẫu khi gửi đợt nào không cần soạn lại. Lưu vĩnh viễn qua `settingsStore` (key `emailTemplates` + `activeTemplateIndex`).
-- **Selector chip** trên PreviewScreen — phía trên thanh search, hiển thị label "Mẫu email" + 3 chip click-to-switch (chip active = nền cam `#FFF7ED`, border cam). Nút **"✎ Sửa nội dung"** mở modal editor.
+- **Split-button dropdown** trên PreviewScreen footer — nút "Gửi N phiếu" giờ có chevron `▼` bên phải. Click chevron → dropdown menu liệt kê 3 mẫu, click row để switch active (✓ icon + nền cam nhẹ). Hover hoặc focus row → nút Pencil edit xuất hiện → click → mở modal editor đúng tab đó.
 - **Modal editor**: 3 tabs (mỗi tab 1 mẫu), 3 ô nhập (Tên mẫu / Tiêu đề / Nội dung), preview render real-time bên phải. Variable chips `{ten} {thang} {nam} {cong_ty} {mat_khau}` — click chip để chèn vào nội dung tại vị trí con trỏ; vẫn gõ tay được vào Tiêu đề.
-- **Mẫu đang dùng** được pass đi qua `templateIndex` trong `SendOptions` cho cả `Gửi thử` (dry-run) và `Gửi thật`. Khi đổi mẫu nhanh từ chip, lựa chọn được nhớ qua `templates.save`.
+- **Modal scoped to content column** — backdrop `absolute inset-0` (anchored vào PreviewScreen `relative` root) thay vì `fixed inset-0` viewport, nên **sidebar vẫn ấn được** khi modal mở. Backdrop click KHÔNG đóng modal (chỉ X / Huỷ / Esc đóng được — đúng spec UX).
+- **Mẫu đang dùng** được pass qua `templateIndex` trong `SendOptions` cho cả `Gửi thử` (dry-run) và `Gửi thật`. Khi đổi mẫu nhanh từ menu, lựa chọn được nhớ qua `templates.save`.
 - Render-client trong PreviewScreen mirror logic `renderTemplate` trong `electron/modules/emailSender.ts` — preview hiển thị **đúng** với email thật.
+- Keyboard a11y: Esc đóng menu/modal, focus-visible reveal cho nút edit, ARIA `role="menu"`/`menuitemradio`/`aria-checked`/`aria-expanded`.
 
 ---
 
