@@ -199,30 +199,76 @@ Smoke test thực hiện:
 
 ## 7. Release
 
-### Tự động (khuyến nghị)
+### ✅ Cách 1 — Push tag → CI tự build & publish (LUÔN DÙNG CÁCH NÀY)
+
+Đây là **đường ship duy nhất được khuyến nghị**. Local không cần build, chỉ bump version và push tag.
 
 ```bash
-# Patch release (0.1.0 → 0.1.1)
-npm run release
+# 1. Bump version (qua PR + review, hoặc commit trực tiếp nếu là patch)
+#    - phieu-luong-app/package.json   →  "version": "0.3.1"   (3-digit)
+#    - phieu-luong-app/VERSION        →  0.3.1.0              (4-digit, +".0")
+#    - phieu-luong-app/CHANGELOG.md   →  thêm entry [0.3.1]
 
-# Minor release (0.1.0 → 0.2.0)
-npm run release:minor
+# 2. Merge bump vào main qua PR (nếu chưa làm)
+gh pr merge <pr-number> --squash
 
-# Major release (0.1.0 → 1.0.0)
-npm run release:major
+# 3. Pull main về local
+git checkout main && git pull --ff-only
+
+# 4. Tạo annotated tag khớp với version đã bump
+git tag -a v0.3.1 -m "Release v0.3.1: <short summary>"
+
+# 5. Push tag
+git push origin v0.3.1
 ```
 
-Script `scripts/release.mjs` thực hiện:
-1. Bump version trong `package.json` (semver 3-digit)
-2. Sync `VERSION` file (4-digit: `0.1.0.0` — dùng cho gstack-ship)
-3. Build Windows: `npm run build:win`
-4. `git add`, `git commit "chore: release vX.Y.Z"`, `git tag vX.Y.Z`
-5. `git push && git push --tags`
-6. `gh release create vX.Y.Z <exe> <latest.yml>` — publish GitHub Release
+→ CI workflow `.github/workflows/build.yml` tự động:
 
-### CI Auto-build
+| Job | Runner | Output |
+|---|---|---|
+| `build (macos-latest, mac)` | macOS native runner | `*.dmg` + `latest-mac.yml` + `*.blockmap` |
+| `build (windows-latest, win)` | **Windows Server VM thật** | `*.exe` + `latest.yml` + `*.blockmap` |
+| `release` (ubuntu-latest) | Ubuntu runner | Tạo GitHub Release, upload tất cả artifacts |
 
-Push tag `vX.Y.Z` → `.github/workflows/build.yml` tự build DMG + EXE và upload vào GitHub Release (cần setup workflow riêng, xem `.github/`).
+End-user app sẽ nhận update qua `electron-updater` (poll GitHub Releases mỗi 1 giờ + 3s sau khởi động).
+
+### ⚠️ Cách 2 — `npm run release` (DEPRECATED, không dùng nữa)
+
+`scripts/release.mjs` chạy mọi thứ local (bump + build + tag + push + gh release). **Có 3 bẫy lớn**:
+
+1. **Build local trên Mac sẽ fail nếu chưa có wine + Rosetta**
+   - `electron-builder --win` cần `rcedit` (Windows binary) chạy qua wine
+   - Cached wine ở `~/Library/Caches/electron-builder/wine/` là Intel x86_64 binary
+   - Apple Silicon (M1/M2/M3...) không chạy Intel binary trừ khi có Rosetta installed
+   - **Hệ quả**: `cannot execute ... bad CPU type in executable` → build die.
+   - Fix nếu BUỘC PHẢI build local: `sudo softwareupdate --install-rosetta --agree-to-license` + `brew install --cask wine-stable`. Nhưng vẫn nên dùng Cách 1.
+
+2. **Script tự bump version từ `package.json` hiện tại**
+   - Nếu bạn đã bump version qua PR rồi (ví dụ thành `0.3.1`), chạy `npm run release` sẽ bump LẦN NỮA thành `0.3.2`.
+   - Không có cờ "use current version".
+
+3. **Chỉ build Windows, không build Mac**
+   - `scripts/release.mjs` line 65: `run('npm run build:win', ...)` — không có `build:mac`.
+   - Mac users không nhận auto-update qua flow này.
+
+→ **Đừng chạy `npm run release` nữa**. Dùng Cách 1 cho mọi release.
+
+### CI workflow đã được fix từ PR #9
+
+CI từng broken từ v0.2.3 đến v0.3.0 (lỗi `GH_TOKEN not set` do `electron-builder` tự ý publish trong lúc build). PR #9 sửa bằng `--publish never` + thêm `*.yml`/`*.blockmap` vào upload list. Từ v0.3.1 trở đi mọi release đều đi qua CI tag-push.
+
+### Build local chỉ để TEST
+
+- **Mac DMG (để test local cài đặt)**: `npm run build:mac` → `release/*.dmg`
+- **Windows .exe**: **KHÔNG build trên Mac**. Chạy trên Windows hoặc dùng CI.
+
+### Version files
+
+Hai file phải đồng bộ:
+- `package.json` → `"version": "0.3.1"` — semver 3-digit, electron-updater + npm
+- `VERSION` → `0.3.1.0` — 4-digit, tooling nội bộ (gstack-ship)
+
+Khi bump qua PR, sửa CẢ HAI file. CHANGELOG.md cũng nên có entry tương ứng.
 
 ### Version files
 
